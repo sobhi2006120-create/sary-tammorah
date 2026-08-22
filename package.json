@@ -1,0 +1,13 @@
+{ "name": "sari-sheets-app", "version": "1.0.0", "description": "صاري 5.0 - Frontend + Backend",
+  "main": "index.html",
+  "scripts": {
+    "start": "node start.js start",
+    "frontend": "node start.js frontend",
+    "dev": "node start.js dev",
+    "status": "node start.js status",
+    "stop": "node start.js stop"
+  },
+  "author": "", "license": "ISC",
+  "dependencies": { "googleapis": "^135.0.0", "express": "^4.21.0", "jsrsasign": "^11.1.0" },
+  "devDependencies": { "nodemon": "^3.0.1" }
+}

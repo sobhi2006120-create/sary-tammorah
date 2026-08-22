@@ -1,0 +1,2018 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>صاري 5.0 - إدارة جداول البيانات</title>
+
+    <!-- jsrsasign لتوقيع JWT في المتصفح -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsrsasign/11.1.0/jsrsasign-all-min.js"></script>
+
+    <style>
+        /* ==========================================
+           الجزء 1: المتغيرات والإعدادات الأساسية
+           ========================================== */
+        :root {
+            --gold: #D4AF37;
+            --gold-light: #FFD700;
+            --gold-glow: rgba(212, 175, 55, 0.4);
+            --black: #0A0A0A;
+            --black-2: #1A1A1A;
+            --glass-bg: rgba(26, 26, 26, 0.6);
+            --glass-border: rgba(212, 175, 55, 0.25);
+            --glass-blur: 16px;
+            --text: #FAFAFA;
+            --text-muted: #888;
+            --radius: 16px;
+            --radius-sm: 10px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Tajawal', 'Segoe UI', sans-serif;
+            background: var(--black);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ==========================================
+           الجزء 2: شاشة البداية (Logo Screen)
+           ========================================== */
+        #logo-screen {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--black);
+            z-index: 1000;
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+
+        #logo-screen.hidden {
+            opacity: 0;
+            transform: scale(1.1);
+            pointer-events: none;
+        }
+
+        /* خلفية ليكويد جلاس خلف اللوغو */
+        #logo-screen::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url('bg.png') center/cover no-repeat fixed;
+            opacity: 0.55;
+        }
+
+        #logo-screen::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, rgba(212, 175, 55, 0.08), transparent 70%);
+        }
+
+        .logo-container {
+            position: relative;
+            cursor: pointer;
+            z-index: 2;
+            animation: logoFloat 4s ease-in-out infinite;
+        }
+
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-12px); }
+        }
+
+        /* حلقة ليكويد جلاس حول اللوغو */
+        .logo-ring {
+            position: absolute;
+            inset: -30px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--gold-glow), transparent 70%);
+            filter: blur(30px);
+            animation: ringPulse 3s ease-in-out infinite;
+            z-index: -1;
+        }
+
+        @keyframes ringPulse {
+            0%, 100% { transform: scale(1); opacity: 0.6; }
+            50% { transform: scale(1.15); opacity: 1; }
+        }
+
+        .logo-img {
+            width: 280px;
+            max-width: 60vw;
+            height: auto;
+            border-radius: 50%;
+            padding: 8px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            border: 2px solid var(--glass-border);
+            box-shadow:
+                0 0 60px var(--gold-glow),
+                inset 0 0 30px rgba(212, 175, 55, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .logo-img:hover {
+            transform: scale(1.03);
+            box-shadow:
+                0 0 80px var(--gold-glow),
+                inset 0 0 40px rgba(212, 175, 55, 0.15);
+        }
+
+        .logo-hint {
+            position: absolute;
+            bottom: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--gold);
+            font-size: 0.9rem;
+            white-space: nowrap;
+            opacity: 0.7;
+            animation: hintPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes hintPulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+
+        /* ==========================================
+           الجزء 3: شاشة التطبيق الرئيسية
+           ========================================== */
+        #app-screen {
+            display: none;
+            min-height: 100vh;
+            background: var(--black);
+        }
+
+        #app-screen.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ==========================================
+           الجزء 4: الهيدر مع زر العودة
+           ========================================== */
+        .app-header {
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            border-bottom: 1px solid var(--glass-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-title {
+            font-size: 1.2rem;
+            color: var(--gold);
+            font-weight: 600;
+        }
+
+        .back-btn, .home-btn {
+            background: none;
+            border: 1px solid var(--glass-border);
+            color: var(--gold);
+            padding: 0.5rem 1.2rem;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .back-btn:hover, .home-btn:hover {
+            background: rgba(212, 175, 55, 0.1);
+            box-shadow: 0 0 15px var(--gold-glow);
+        }
+
+        /* ==========================================
+           الجزء 5: أزرار التبويبات (Liquid Glass)
+           ========================================== */
+        #tabs-section {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        #tabs-section.hidden {
+            display: none;
+        }
+
+        .tabs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .tab-btn {
+            position: relative;
+            padding: 2rem 1.5rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--glass-border);
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            color: var(--text);
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.4s ease;
+            font-family: inherit;
+            overflow: hidden;
+        }
+
+        /* تأثير الليكويد جلاس: توهج داخلي متحرك */
+        .tab-btn::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+                        rgba(212, 175, 55, 0.12), transparent 60%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            pointer-events: none;
+        }
+
+        .tab-btn:hover::before {
+            opacity: 1;
+        }
+
+        .tab-btn::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .tab-btn:hover::after {
+            opacity: 0.6;
+        }
+
+        .tab-btn:hover {
+            transform: translateY(-4px);
+            border-color: var(--gold);
+            box-shadow:
+                0 10px 40px rgba(212, 175, 55, 0.15),
+                inset 0 0 20px rgba(212, 175, 55, 0.05);
+        }
+
+        .tab-btn .tab-icon {
+            font-size: 2rem;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .tab-btn .tab-name {
+            font-weight: 600;
+            color: var(--gold);
+        }
+
+        /* ==========================================
+           الجزء 6: عرض بيانات الجدول
+           ========================================== */
+        #content-section {
+            flex: 1;
+            padding: 2rem;
+            display: none;
+        }
+
+        #content-section.active {
+            display: block;
+        }
+
+        #content-section.hidden {
+            display: none;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            color: var(--gold);
+            text-align: center;
+            flex: 1;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .refresh-btn {
+            background: none;
+            border: 1px solid var(--glass-border);
+            color: var(--gold);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.3rem;
+            line-height: 1;
+            transition: all 0.3s ease;
+            display: none;
+            flex-shrink: 0;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(212, 175, 55, 0.1);
+            box-shadow: 0 0 15px var(--gold-glow);
+            transform: rotate(90deg);
+        }
+
+        .refresh-btn.show {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .readonly-badge {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            font-weight: normal;
+        }
+
+        /* حاوية الجدول بتأثير جلاس */
+        .table-glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+
+        .table-glass table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+
+        .table-glass th {
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--gold);
+            padding: 1rem 1.2rem;
+            text-align: right;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .table-glass td {
+            padding: 0.8rem 1.2rem;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.06);
+            color: var(--text);
+        }
+
+        .table-glass tr:hover td {
+            background: rgba(212, 175, 55, 0.03);
+        }
+
+        .table-glass tr:last-child td {
+            border-bottom: none;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        /* ==========================================
+           الجزء 7: الزر العائم (FAB)
+           ========================================== */
+        .fab {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid var(--gold);
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            color: var(--gold);
+            font-size: 1.8rem;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(212, 175, 55, 0.2);
+        }
+
+        .fab.active {
+            display: flex;
+        }
+
+        .fab:hover {
+            transform: scale(1.1) rotate(90deg);
+            box-shadow: 0 4px 30px var(--gold-glow);
+            background: var(--gold);
+            color: var(--black);
+        }
+
+        /* ==========================================
+           الجزء 8: نافذة إدخال البيانات
+           ========================================== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            width: 90%;
+            max-width: 500px;
+            max-height: 85vh;
+            overflow-y: auto;
+            transform: scale(0.9);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            opacity: 0;
+        }
+
+        .modal-overlay.active .modal-glass {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .modal-header h2 {
+            color: var(--gold);
+            font-size: 1.3rem;
+        }
+
+        .close-modal {
+            background: none;
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+        }
+
+        .close-modal:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+
+        .form-group label {
+            display: block;
+            color: var(--gold);
+            font-size: 0.9rem;
+            margin-bottom: 0.4rem;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            background: rgba(36, 36, 36, 0.8);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 0.95rem;
+            transition: border-color 0.3s ease;
+            font-family: inherit;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--gold);
+            box-shadow: 0 0 15px var(--gold-glow);
+        }
+
+        .form-group select {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            background: rgba(36, 36, 36, 0.8);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 0.95rem;
+            transition: border-color 0.3s ease;
+            font-family: inherit;
+            appearance: auto;
+        }
+
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--gold);
+            box-shadow: 0 0 15px var(--gold-glow);
+        }
+
+/* ==========================================
+   parte 9ب: زر طباعة列印 لكل صف مدمج
+   ========================================== */
+        .print-col { width:60px; text-align:center; white-space:nowrap; }
+        .print-row-btn { border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--gold); border-radius:8px; padding:5px 10px; cursor:pointer; backdrop-filter:blur(8px); transition:all .2s }
+        .print-row-btn:hover { border-color:var(--gold); background:rgba(212,175,55,.15); box-shadow:0 0 10px var(--gold-glow) }
+        @media print { .print-col{display:none !important} }
+
+/* ==========================================
+   parte 9ب: مكوّن القائمة القابلة للبحث (Combobox)
+   ========================================== */
+        .combobox {
+            position: relative;
+        }
+
+        .combobox-list {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: rgba(26, 26, 26, 0.97);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 50;
+            display: none;
+            list-style: none;
+            margin: 0;
+            padding: 0.3rem 0;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .combobox-list.show {
+            display: block;
+        }
+
+        .combobox-list.up {
+            top: auto;
+            bottom: calc(100% + 4px);
+        }
+
+        .combobox-item {
+            padding: 0.6rem 1rem;
+            cursor: pointer;
+            color: var(--text);
+            font-size: 0.92rem;
+            transition: background 0.15s ease;
+        }
+
+        .combobox-item:hover,
+        .combobox-item.active {
+            background: rgba(212, 175, 55, 0.15);
+            color: var(--gold);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 0.9rem;
+            border: none;
+            border-radius: var(--radius-sm);
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: var(--black);
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            margin-top: 0.5rem;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px var(--gold-glow);
+        }
+
+        /* ==========================================
+           الجزء 9: إشعارات Toast
+           ========================================== */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            padding: 0.8rem 1.5rem;
+            color: var(--text);
+            font-size: 0.9rem;
+            z-index: 999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .toast.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ==========================================
+           الجزء 9ب: الصفوف القابلة للطباعة
+           ========================================== */
+        .printable-row {
+            cursor: default;
+        }
+
+        .table-glass .printable-row:hover td {
+            background: rgba(212, 175, 55, 0.12);
+        }
+
+        /* ==========================================
+           الجزء 9ج: نافذة تأكيد الطباعة
+           ========================================== */
+        .confirm-msg {
+            color: var(--text-muted);
+            text-align: center;
+            font-size: 0.95rem;
+            line-height: 1.8;
+            padding: 0.5rem 0 1rem;
+        }
+
+        .confirm-msg strong {
+            color: var(--gold);
+        }
+
+        .confirm-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .confirm-btn {
+            flex: 1;
+            padding: 0.85rem;
+            border-radius: var(--radius-sm);
+            border: none;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .confirm-btn.print {
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: var(--black);
+        }
+
+        .confirm-btn.print:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px var(--gold-glow);
+        }
+
+        .confirm-btn.cancel {
+            background: rgba(36, 36, 36, 0.8);
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+        }
+
+        .confirm-btn.cancel:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        /* ==========================================
+           الجزء 9د: منطقة الطباعة وإعدادات الطباعة
+           ========================================== */
+        #print-area {
+            display: none;
+        }
+
+        /* حجم الورق الحراري 80×210مم - صفحة واحدة فقط */
+        @page {
+            size: 80mm 210mm;
+            margin: 3mm;
+        }
+
+        .print-doc {
+            font-family: 'Tajawal', 'Segoe UI', sans-serif;
+            direction: rtl;
+            text-align: right;
+            padding: 0;
+            width: 74mm;
+            max-width: 74mm;
+            margin: 0 auto;
+            color: #000;
+            overflow: hidden;
+        }
+
+        .print-doc .print-title {
+            text-align: center;
+            font-size: 11pt;
+            font-weight: 700;
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+            border-bottom: 1.5px solid #222;
+        }
+
+        .print-doc .print-meta {
+            font-size: 6.5pt;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            color: #333;
+        }
+
+        .print-doc table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            page-break-inside: avoid;
+        }
+
+        .print-doc th,
+        .print-doc td {
+            border: 0.5pt solid #333;
+            padding: 2px 3px;
+            text-align: right;
+            font-size: 8pt;
+            word-wrap: break-word;
+            overflow: hidden;
+        }
+
+        /* عمود الأسماء أعرض من أعمدة القيم */
+        .print-doc tbody th {
+            width: 24mm;
+            background: #e8e8e8;
+        }
+
+        .print-doc th {
+            background: #e8e8e8;
+            font-weight: 700;
+        }
+
+        .print-doc tr {
+            page-break-inside: avoid;
+        }
+
+        @media print {
+            body {
+                background: #fff !important;
+                color: #000 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            #logo-screen,
+            #app-screen,
+            #fab-btn,
+            #entry-modal,
+            #print-confirm-modal,
+            #toast {
+                display: none !important;
+            }
+
+            /* طباعة عادية بدون تدوير - عرض الورقة الحراري */
+            #print-area {
+                display: block !important;
+                width: 74mm;
+                margin: 0 auto;
+                overflow: hidden;
+            }
+
+            .print-doc {
+                position: static;
+                width: 74mm;
+                max-width: 74mm;
+                transform: none;
+            }
+        }
+
+        /* ==========================================
+           الجزء 10: التجاوب مع الشاشات
+           ========================================== */
+        @media (max-width: 600px) {
+            .logo-img { width: 200px; }
+            .tabs-grid { grid-template-columns: 1fr; }
+            .table-glass { font-size: 0.85rem; }
+            .table-glass th,
+            .table-glass td { padding: 0.6rem 0.8rem; }
+            .app-header { padding: 0.8rem 1rem; }
+            #content-section { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ============================================
+         الجزء 11: هيكل HTML
+         ============================================ -->
+
+    <!-- شاشة البداية: اللوغو في المنتصف -->
+    <div id="logo-screen">
+        <div class="logo-container" id="logo-container">
+            <div class="logo-ring"></div>
+            <img src="assets/logo.png" alt="صاري 5.0" class="logo-img" id="logo-img">
+            <div class="logo-hint">⏎ اضغط لفتح جداول البيانات</div>
+        </div>
+    </div>
+
+    <!-- شاشة التطبيق -->
+    <div id="app-screen">
+        <!-- الهيدر -->
+        <header class="app-header">
+            <button class="back-btn" id="back-to-tabs-btn">→ الصفحات</button>
+            <span class="header-title" id="header-title">صاري 5.0</span>
+            <button class="home-btn" id="home-btn">الرئيسية</button>
+        </header>
+
+        <!-- أزرار التبويبات -->
+        <section id="tabs-section">
+            <div class="tabs-grid" id="tabs-grid">
+                <!-- تُملأ ديناميكياً -->
+            </div>
+        </section>
+
+        <!-- محتوى الجدول -->
+        <section id="content-section">
+            <div class="section-header">
+                <h2 class="section-title" id="section-title"></h2>
+                <button class="refresh-btn" id="refresh-btn" title="تحديث البيانات">⟳</button>
+            </div>
+            <div class="table-glass" id="table-container">
+                <!-- يُملأ ديناميكياً -->
+            </div>
+        </section>
+    </div>
+
+    <!-- الزر العائم -->
+    <button class="fab" id="fab-btn">+</button>
+
+    <!-- نافذة الإدخال -->
+    <div class="modal-overlay" id="entry-modal">
+        <div class="modal-glass">
+            <form id="entry-form">
+                <div class="modal-header">
+                    <h2 id="entry-title">إضافة بيانات جديدة</h2>
+                    <button type="button" class="close-modal" id="close-entry-btn">✕</button>
+                </div>
+                <div id="form-fields"></div>
+                <button type="submit" class="submit-btn">حفظ</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- نافذة تأكيد الطباعة -->
+    <div class="modal-overlay" id="print-confirm-modal">
+        <div class="modal-glass">
+            <div class="modal-header">
+                <h2>🖨️ طباعة الصف</h2>
+                <button type="button" class="close-modal" id="close-print-confirm-btn">✕</button>
+            </div>
+            <p class="confirm-msg">هل تريد طباعة هذه المجموعة (3 صفوف معاً) من ورقة <strong id="print-confirm-sheet"></strong>؟</p>
+            <div class="confirm-actions">
+                <button type="button" class="confirm-btn cancel" id="print-cancel-btn">إلغاء</button>
+                <button type="button" class="confirm-btn print" id="print-confirm-btn">طباعة</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- منطقة الطباعة -->
+    <div id="print-area">
+        <div class="print-doc" id="print-doc"></div>
+    </div>
+
+    <!-- ============================================
+         الجزء 12: إعدادات التطبيق
+         ============================================ -->
+    <script>
+        // إعدادات اتصال Google Sheets
+        var CONFIG = (function() {
+            return {
+                spreadsheedId: '1qKZwEaIxwmCHZf48MJfvkLRVCxASh_MmdTxw9s1VSnk',
+                serviceAccount: {
+                    clientEmail: 'sari-sheets-bot@sari-sheets-app.iam.gserviceaccount.com',
+                    privateKey: '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCW/SMSpkZyoetU\nHGa4AnWFf05it+8cO+2Z65W4O4Ds/yGwASfQ0e5Enga/6sBxHYPMmWs0HaE4bE48\nhk9Zhhhwa6av1OxJwEoliklnlJ79Pfbrh/0kw6Ela9Rto+lZEjBMuFZCYkNt5i/9\ngfB4hNp6Zgegf/0T61xJHkDK/gD4crHu9MTww6Ms6/t0JkbBJJsGq3kjPDhuidC0\n23lmulyRbP6FxBPg5PBIKrW6ZUjVR5ppSDZ1Dujr5+YN3R9GT7pmDQu+pn4/aeRl\nTjqyrt6rADemo67isqBoC8/t9F1FMKgGDAKi9AGLpkBJoAfd0m7UWTFjcNq9f/Jc\n67yvVpiNAgMBAAECggEAEZFN56FXkIZk7GIqlG3a0SfNDcDjbghN/qrxvmAUAd80\ngvc7c/k9DRhK5kEQ14hs2Z0fI07wP3Ggj7u710l6JfhsikhOns0kA2ap4EajUglH\n5cMqkcC+Su2XJ5Oa9q1eV8rZ5Hrs6AhQnKEmAsvIZNXivMqvfkYT9IDz3np7z+xQ\npPTlAQy4hk8cH2wVXOM1o42LSTb2Ma4exhejzs/EoP/tt7W+yV/BUxEY870PPiDa\nZczOi8ocdBtzbbpaz5jSR9YC/s4S7hiVsElh3ymuRvMm/hYC6WV6SHCRZOreSIpD\nk1MlP5iP+Dq/CxuOoZAyJXXWZ2/4xBcktqR10TEtQQKBgQDHOr++4dlpdWhPzpiY\nT3IcZ332KHLSPOlCWebJXKhNcwuEQWwhMtligwbuN4jfgVIFZKATlBmz5CKw1FLQ\nAh0Coo5qqvkwX8xEdwccCMXeChymDR3cqFLQAv9DslUpfCCCQfxaWXpCF0utP1x0\nYnhmoonqPzWdrj6fJ4VSqXQszQKBgQDCA1ydlPz9dhfuAIL8wwIAkHvM1LCxWZOU\n79HmvT7OFnsaYPcqnccb9vbXeNsemOfs8JtmjLOy3sO4mvvcB6MQgfnlnPyjDM/7\nicJEdOWsIUxicoC1uDMwoAqMIfarTH128zK63ql+kMYy/lvs0I55T/vRDH/r3tI9\nWgFWKwQawQKBgEqqEMxHtgQY1SP7qCKEu547hvBmzklOPJj6OkzCpeyIrgs9vXlf\npiqOMl26gFhLDeMph/hua4eIexvMJtD/ycGADGGbe9IORO5vsUFnZEhHf98XUVat\n2oNMbEABqHroowJOGnX9zJzSQDFIaqzPbpIAXjFkyQI0GBHrbMLC8OANAoGAfIA7\nxsP9NYm7AXhCloFtn38YcvFqEeUx17muMSvwScATb3IaKrblNwTckplzw8bLzjj5\nAG36QybA4o5SYXhlJArEmpyLYvat4PUePV/movcbVXG1NuflsaaCHjsNWA/V06dt\nPo30psuw5LhltSqAw0iYiCZFUM/EiqpfgTRJhgECgYEAo6dQMNlqr6AvPw0Rs5pW\naQQ0qTyvy6ztb6HH8mh+z8rz40kYdtpfw5OXnvB82sRGfape8mSItfQAZkIxaMdL\nEJz/LcqEa8WCmh6QLORKI061myCrdQjZm3Gojh54LDRTTVVSZC0g6sujjkfZ5weZ\n4UNniZj9/hJno6IuKvoQzk4=\n-----END PRIVATE KEY-----\n'
+                }
+            };
+        })();
+
+        // الأوراق المسموح فيها بالكتابة
+        var WRITABLE_SHEETS = ['دفتر عمال', 'دفتر سلف', 'تصريف ايصالات'];
+
+        function isWritable(tabName) {
+            return WRITABLE_SHEETS.indexOf(String(tabName || '').trim()) !== -1;
+        }
+
+        // الأوراق التي يُسمح فيها بطباعة صف يحوي خلية مدمجة عند النقر عليه
+        var PRINT_SHEETS = ['حساب عمال'];
+
+        function isPrintable(tabName) {
+            return PRINT_SHEETS.indexOf(String(tabName || '').trim()) !== -1;
+        }
+
+        // ============================================
+        // الجزء 13: دوال API (JWT + Google Sheets)
+        // ============================================
+
+        // الحصول على Access Token عبر JWT
+        async function getAccessToken() {
+            var sa = CONFIG.serviceAccount;
+            var now = Math.floor(Date.now() / 1000);
+
+            var header = { alg: 'RS256', typ: 'JWT' };
+            var payload = {
+                iss: sa.clientEmail,
+                scope: 'https://www.googleapis.com/auth/spreadsheets',
+                aud: 'https://oauth2.googleapis.com/token',
+                exp: now + 3600,
+                iat: now
+            };
+
+            // توقيع JWT بالمفتاح الخاص
+            var token = KJUR.jws.JWS.sign(
+                'RS256',
+                JSON.stringify(header),
+                JSON.stringify(payload),
+                sa.privateKey.replace(/\\n/g, '\n')
+            );
+
+            var res = await fetch('https://oauth2.googleapis.com/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                    assertion: token
+                })
+            });
+
+            var data = await res.json();
+            if (!data.access_token) {
+                throw new Error(data.error_description || 'فشل المصادقة مع Google');
+            }
+            return data.access_token;
+        }
+
+        // طلب GET لـ Google Sheets API
+        async function sheetsGet(endpoint) {
+            var token = await getAccessToken();
+            var res = await fetch(
+                'https://sheets.googleapis.com/v4/spreadsheets/' +
+                CONFIG.spreadsheedId + '/' + endpoint, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                }
+            );
+            if (!res.ok) {
+                var errText = await res.text();
+                throw new Error(errText);
+            }
+            return res.json();
+        }
+
+        // طلب POST لـ Google Sheets API
+        async function sheetsPost(endpoint, body) {
+            var token = await getAccessToken();
+            var res = await fetch(
+                'https://sheets.googleapis.com/v4/spreadsheets/' +
+                CONFIG.spreadsheedId + '/' + endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                }
+            );
+            if (!res.ok) {
+                var errText = await res.text();
+                throw new Error(errText);
+            }
+            return res.json();
+        }
+
+        // جلب قائمة التبويبات
+        async function listTabs() {
+            var data = await sheetsGet('?fields=sheets.properties.title');
+            return data.sheets.map(function(s) { return s.properties.title; });
+        }
+
+        // تحويل حروف العمود إلى رقم صفري (A=0, B=1, ...)
+        function colLettersToIndex(str) {
+            var idx = 0;
+            for (var c = 0; c < str.length; c++) {
+                idx = idx * 26 + (str.charCodeAt(c) - 64);
+            }
+            return idx - 1;
+        }
+
+        // قراءة بيانات تبويب معين
+        async function readTab(tabName) {
+            var data = await sheetsGet('values/' + encodeURIComponent(tabName));
+            // استخراج أول عمود في النطاق من حقل range (مثل Sheet1!B1:E10)
+            var startColIndex = 0;
+            var rangeStr = data.range || '';
+            var match = rangeStr.match(/!([A-Z]+)\d+/);
+            if (match && match[1]) {
+                startColIndex = colLettersToIndex(match[1]);
+            }
+            return {
+                headers: data.values ? data.values[0] : [],
+                rows: data.values ? data.values.slice(1) : [],
+                startColIndex: startColIndex
+            };
+        }
+
+        // إضافة صف جديد
+        async function appendRow(tabName, values) {
+            return sheetsPost(
+                'values/' + encodeURIComponent(tabName) + '!A:Z:append?valueInputOption=USER_ENTERED',
+                { values: [values] }
+            );
+        }
+
+        // جلب معلومات الدمج والخط من جدول البيانات
+        async function getSheetFormatData(tabName, limitRange) {
+            // اقتباس الاسم كما هو (المسافة الزائدة جزء من الاسم الفعلي في Google Sheets)
+            var range = limitRange || ("'" + String(tabName) + "'!A1:Z200");
+            var data = await sheetsGet(
+                '?includeGridData=true' +
+                '&ranges=' + encodeURIComponent(range) +
+                '&fields=sheets(properties.title,merges,data.rowData.values.effectiveFormat.textFormat.fontSize)'
+            );
+            var tName = String(tabName).trim();
+            var sheet = (data.sheets || []).find(function(s) {
+                return s.properties && String(s.properties.title).trim() === tName;
+            }) || (data.sheets && data.sheets[0]);
+            if (!sheet) return { merges: [], fontSizes: [] };
+
+            // الدمج موجود على مستوى الورقة مباشرة
+            var merges = sheet.merges || [];
+            console.log('🎨', tName, '→ merges:', merges.length);
+            var rowsData = sheet.data || [];
+            var fontSizes = [];
+            rowsData.forEach(function(d) {
+                (d.rowData || []).forEach(function(row) {
+                    var rowSizes = [];
+                    (row.values || []).forEach(function(cell) {
+                        if (cell && cell.effectiveFormat && cell.effectiveFormat.textFormat && cell.effectiveFormat.textFormat.fontSize) {
+                            rowSizes.push(cell.effectiveFormat.textFormat.fontSize);
+                        } else {
+                            rowSizes.push(null);
+                        }
+                    });
+                    fontSizes.push(rowSizes);
+                });
+            });
+            return { merges: merges, fontSizes: fontSizes };
+        }
+
+        // بناء خريطة الخلايا المدمجة (للتخطي في الجدول)
+        function buildMergeMap(merges) {
+            var skip = {};
+            var anchors = {};
+            merges.forEach(function(m) {
+                var r1 = m.startRowIndex, r2 = m.endRowIndex;
+                var c1 = m.startColumnIndex, c2 = m.endColumnIndex;
+                for (var r = r1; r < r2; r++) {
+                    for (var c = c1; c < c2; c++) {
+                        if (r === r1 && c === c1) {
+                            anchors[r + ',' + c] = {
+                                colspan: c2 - c1,
+                                rowspan: r2 - r1
+                            };
+                        } else {
+                            skip[r + ',' + c] = true;
+                        }
+                    }
+                }
+            });
+            return { skip: skip, anchors: anchors };
+        }
+
+        // قراءة نطاق قيم محدد (مثل قائمة منسدلة من نطاق آخر)
+        async function readRange(range) {
+            var data = await sheetsGet('values/' + encodeURIComponent(range));
+            return data.values || [];
+        }
+
+        // تهريب نص لمنع كسر الـ HTML
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // تهيئة مكوّن القائمة القابلة للبحث (Combobox)
+        function initCombobox(input, list, options) {
+            var filtered = options.slice();
+            var activeIndex = -1;
+            var explicitlySelected = false;
+
+            function render() {
+                if (!filtered.length) {
+                    list.classList.remove('show');
+                    list.innerHTML = '';
+                    return;
+                }
+                list.innerHTML = filtered.map(function(o, idx) {
+                    var esc = escapeHtml(o);
+                    return '<li class="combobox-item' + (idx === activeIndex ? ' active' : '') +
+                        '" data-val="' + esc + '">' + esc + '</li>';
+                }).join('');
+                list.classList.add('show');
+
+                // افتح القائمة للأعلى إن كانت ستتجاوز أسفل الشاشة
+                list.classList.remove('up');
+                var rect = list.getBoundingClientRect();
+                if (rect.bottom > window.innerHeight) {
+                    list.classList.add('up');
+                }
+            }
+
+            function filter() {
+                var q = input.value.trim().toLowerCase();
+                filtered = options.filter(function(o) {
+                    return String(o).toLowerCase().indexOf(q) !== -1;
+                });
+                activeIndex = filtered.length ? 0 : -1;
+                render();
+            }
+
+            input.addEventListener('input', function() {
+                explicitlySelected = false;
+                filter();
+            });
+            input.addEventListener('focus', filter);
+
+            // عند الخروج من الحقل دون اختيار: اختر أول اقتراح معروض
+            input.addEventListener('blur', function() {
+                setTimeout(function() {
+                    if (!explicitlySelected && filtered.length) {
+                        input.value = filtered[0];
+                    }
+                    list.classList.remove('show');
+                }, 120);
+            });
+
+            // النقر على عنصر (قبل حدث blur لالتقاط القيمة)
+            list.addEventListener('mousedown', function(e) {
+                var item = e.target.closest('.combobox-item');
+                if (item) {
+                    e.preventDefault();
+                    input.value = item.getAttribute('data-val');
+                    explicitlySelected = true;
+                    list.classList.remove('show');
+                    input.focus();
+                }
+            });
+
+            // التنقل بلوحة المفاتيح
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (activeIndex < filtered.length - 1) activeIndex++;
+                    render();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (activeIndex > 0) activeIndex--;
+                    render();
+                } else if (e.key === 'Enter') {
+                    if (filtered.length && activeIndex >= 0) {
+                        e.preventDefault();
+                        input.value = filtered[activeIndex];
+                        explicitlySelected = true;
+                        list.classList.remove('show');
+                    }
+                } else if (e.key === 'Escape') {
+                    list.classList.remove('show');
+                }
+            });
+        }
+
+        // تحليل قاعدة التحقق (Data Validation) إلى قائمة خيارات
+        async function parseDropdown(dv) {
+            var cond = dv.condition || {};
+            var type = cond.type;
+
+            // قائمة ثابتة: القيم مكتوبة مباشرة في القاعدة
+            if (type === 'ONE_OF_LIST') {
+                var opts = (cond.values || []).map(function(v) {
+                    return v.userEnteredValue;
+                }).filter(function(v) { return v !== undefined && v !== ''; });
+                return opts.length ? { options: opts } : null;
+            }
+
+            // قائمة من نطاق: القيمة عبارة عن إشارة مثل =Sheet2!A1:A5
+            if (type === 'ONE_OF_RANGE') {
+                var ref = (cond.values && cond.values[0] && cond.values[0].userEnteredValue) || '';
+                ref = ref.replace(/^=/, '').trim();
+                if (!ref) return null;
+                try {
+                    var rows = await readRange(ref);
+                    var rangeOpts = [];
+                    rows.forEach(function(row) {
+                        row.forEach(function(v) {
+                            if (v !== undefined && v !== '') rangeOpts.push(v);
+                        });
+                    });
+                    return rangeOpts.length ? { options: rangeOpts } : null;
+                } catch (e) {
+                    console.error('تعذر جلب نطاق القائمة المنسدلة:', ref, e);
+                    return null;
+                }
+            }
+
+            return null;
+        }
+
+        // جلب القوائم المنسدلة (Data Validation) لكل عمود في التبويب
+        async function getColumnDropdowns(tabName) {
+            var data = await sheetsGet(
+                '?includeGridData=true' +
+                '&ranges=' + encodeURIComponent("'" + String(tabName) + "'!A1:Z50") +
+                '&fields=sheets(data.rowData.values.dataValidation)'
+            );
+
+            // تخزين أول قاعدة تحقق لكل عمود (القاعدة مخزنة في أول خلية من النطاق)
+            var raw = [];
+            var targetSheet = (data.sheets || []).find(function(s) {
+                return s.properties && s.properties.title === tabName;
+            }) || (data.sheets && data.sheets[0]);
+            var sheetData = targetSheet && targetSheet.data;
+            (sheetData || []).forEach(function(d) {
+                (d.rowData || []).forEach(function(row) {
+                    (row.values || []).forEach(function(cell, c) {
+                        if (cell.dataValidation && !raw[c]) {
+                            raw[c] = cell.dataValidation;
+                        }
+                    });
+                });
+            });
+
+            var result = [];
+            for (var c = 0; c < raw.length; c++) {
+                if (raw[c]) {
+                    result[c] = await parseDropdown(raw[c]);
+                }
+            }
+            return result;
+        }
+
+        // ============================================
+        // الجزء 14: كائن التطبيق الرئيسي
+        // ============================================
+
+        var App = {
+            // حالة التطبيق
+            state: {
+                currentTab: null,      // اسم التبويب الحالي
+                headers: [],           // عناوين الأعمدة
+                tabs: [],              // قائمة التبويبات
+                isEntryOpen: false,    // هل نافذة الإدخال مفتوحة
+                firstColIndex: 0,      // الإزاحة الكلية من العمود A للمحاذاة عند الحفظ
+                emptyOffset: 0,        // عدد الأعمدة الفارغة في بداية الرأس داخل النطاق
+                adjustedHeaders: false, // هل تم تعديل الرأس بسبب صف عنوان مدمج
+                sheetMeta: {},           // معلومات التنسيق المخبأة لكل ورقة {‎tabName: {merges, fontSizes}}
+                currentHeaders: [],      // عناوين الأعمدة المعروضة حالياً
+                currentRows: [],         // صفوف البيانات المعروضة حالياً
+                pendingPrintRow: null    // رقم الصف المحدد للطباعة
+            },
+
+            // مراجع عناصر DOM
+            dom: {},
+
+            // تهيئة المراجع
+            cacheDom: function() {
+                this.dom = {
+                    logoScreen: document.getElementById('logo-screen'),
+                    logoContainer: document.getElementById('logo-container'),
+                    appScreen: document.getElementById('app-screen'),
+                    headerTitle: document.getElementById('header-title'),
+                    backBtn: document.getElementById('back-to-tabs-btn'),
+                    homeBtn: document.getElementById('home-btn'),
+                    tabsSection: document.getElementById('tabs-section'),
+                    tabsGrid: document.getElementById('tabs-grid'),
+                    contentSection: document.getElementById('content-section'),
+                    sectionTitle: document.getElementById('section-title'),
+                    tableContainer: document.getElementById('table-container'),
+                    fab: document.getElementById('fab-btn'),
+                    refreshBtn: document.getElementById('refresh-btn'),
+                    entryModal: document.getElementById('entry-modal'),
+                    entryForm: document.getElementById('entry-form'),
+                    entryTitle: document.getElementById('entry-title'),
+                    formFields: document.getElementById('form-fields'),
+                    closeEntryBtn: document.getElementById('close-entry-btn'),
+                    toast: document.getElementById('toast'),
+                    printConfirmModal: document.getElementById('print-confirm-modal'),
+                    closePrintConfirmBtn: document.getElementById('close-print-confirm-btn'),
+                    printCancelBtn: document.getElementById('print-cancel-btn'),
+                    printConfirmBtn: document.getElementById('print-confirm-btn'),
+                    printConfirmSheet: document.getElementById('print-confirm-sheet'),
+                    printDoc: document.getElementById('print-doc')
+                };
+            },
+
+            // ربط الأحداث
+            bindEvents: function() {
+                // فتح التطبيق عند النقر على اللوغو
+                this.dom.logoContainer.addEventListener('click', function() {
+                    App.openApp();
+                });
+
+                // العودة لشاشة التبويبات
+                this.dom.backBtn.addEventListener('click', function() {
+                    App.showTabs();
+                });
+
+                // العودة للشاشة الرئيسية (اللوغو)
+                this.dom.homeBtn.addEventListener('click', function() {
+                    App.goHome();
+                });
+
+                // الزر العائم
+                this.dom.fab.addEventListener('click', function() {
+                    App.openEntryForm();
+                });
+
+                // زر تحديث البيانات
+                this.dom.refreshBtn.addEventListener('click', function() {
+                    App.refreshCurrentTab();
+                });
+
+                // إغلاق نافذة الإدخال
+                this.dom.closeEntryBtn.addEventListener('click', function() {
+                    App.closeEntryForm();
+                });
+
+                // إغلاق نافذة الإدخال بالنقر خارجها
+                this.dom.entryModal.addEventListener('click', function(e) {
+                    if (e.target === App.dom.entryModal) {
+                        App.closeEntryForm();
+                    }
+                });
+
+                // إغلاق نافذة تأكيد الطباعة
+                this.dom.closePrintConfirmBtn.addEventListener('click', function() {
+                    App.closePrintConfirm();
+                });
+                this.dom.printCancelBtn.addEventListener('click', function() {
+                    App.closePrintConfirm();
+                });
+                this.dom.printConfirmBtn.addEventListener('click', function() {
+                    App.doPrint();
+                });
+
+                // إغلاق نافذة تأكيد الطباعة بالنقر خارجها
+                this.dom.printConfirmModal.addEventListener('click', function(e) {
+                    if (e.target === App.dom.printConfirmModal) {
+                        App.closePrintConfirm();
+                    }
+                });
+
+                // إرسال نموذج الإدخال
+                this.dom.entryForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    App.handleEntrySubmit();
+                });
+
+                // إغلاق النوافذ بـ Escape
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') {
+                        if (App.state.isEntryOpen) {
+                            App.closeEntryForm();
+                        } else if (App.dom.printConfirmModal.classList.contains('active')) {
+                            App.closePrintConfirm();
+                        }
+                    }
+                });
+            },
+
+            // ============================================
+            // الجزء 15: التنقل بين الشاشات
+            // ============================================
+
+            // فتح التطبيق (النقر على اللوغو)
+            openApp: function() {
+                // إخفاء شاشة اللوغو
+                this.dom.logoScreen.classList.add('hidden');
+
+                // إظهار شاشة التطبيق
+                this.dom.appScreen.classList.add('active');
+
+                // تحميل التبويبات
+                this.loadTabs();
+            },
+
+            // العودة لشاشة اللوغو
+            goHome: function() {
+                this.dom.appScreen.classList.remove('active');
+                this.dom.logoScreen.classList.remove('hidden');
+                this.dom.contentSection.classList.remove('active');
+                this.dom.tabsSection.classList.remove('hidden');
+                this.dom.fab.classList.remove('active');
+                this.state.currentTab = null;
+            },
+
+            // إظهار أزرار التبويبات
+            showTabs: function() {
+                this.dom.tabsSection.classList.remove('hidden');
+                this.dom.contentSection.classList.remove('active');
+                this.dom.contentSection.classList.add('hidden');
+                this.dom.fab.classList.remove('active');
+                this.state.currentTab = null;
+            },
+
+            // التوجه لتبويب معين
+            navigateToTab: function(tabName) {
+                this.state.currentTab = tabName;
+                this.dom.headerTitle.textContent = tabName;
+                this.dom.tabsSection.classList.add('hidden');
+                this.dom.contentSection.classList.remove('hidden');
+                this.dom.contentSection.classList.add('active');
+
+                // إظهار الزر العائم فقط للأوراق القابلة للكتابة
+                if (isWritable(tabName)) {
+                    this.dom.fab.classList.add('active');
+                } else {
+                    this.dom.fab.classList.remove('active');
+                }
+
+                this.loadTabData(tabName);
+            },
+
+            // ============================================
+            // الجزء 16: تحميل البيانات
+            // ============================================
+
+            // تحميل أزرار التبويبات
+            loadTabs: function() {
+                this.showToast('جاري تحميل الصفحات...');
+
+                listTabs().then(function(tabs) {
+                    App.state.tabs = tabs;
+                    App.renderTabs(tabs);
+                    App.showToast('تم تحميل ' + tabs.length + ' صفحة');
+                }).catch(function(err) {
+                    console.error('خطأ في تحميل التبويبات:', err);
+                    App.showToast('فشل تحميل الصفحات');
+                    App.dom.tabsGrid.innerHTML =
+                        '<div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-muted);">' +
+                        '⚠️ فشل الاتصال بـ Google Sheets</div>';
+                });
+            },
+
+            // عرض أزرار التبويبات
+            renderTabs: function(tabs) {
+                this.dom.tabsGrid.innerHTML = tabs.map(function(tab) {
+                    return '<button class="tab-btn" data-tab="' + tab + '">' +
+                        '<span class="tab-icon">📊</span>' +
+                        '<span class="tab-name">' + tab + '</span>' +
+                        '</button>';
+                }).join('');
+
+                // ربط حدث النقر لكل زر
+                this.dom.tabsGrid.querySelectorAll('.tab-btn').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        var tabName = this.getAttribute('data-tab');
+                        App.navigateToTab(tabName);
+                    });
+
+                    // تأثير تتبع الماوس للزجاج السائل
+                    btn.addEventListener('mousemove', function(e) {
+                        var rect = this.getBoundingClientRect();
+                        var x = ((e.clientX - rect.left) / rect.width) * 100;
+                        var y = ((e.clientY - rect.top) / rect.height) * 100;
+                        this.style.setProperty('--mouse-x', x + '%');
+                        this.style.setProperty('--mouse-y', y + '%');
+                    });
+                });
+            },
+
+            // تحميل بيانات تبويب معين
+            loadTabData: function(tabName) {
+                var writable = isWritable(tabName);
+                this.dom.sectionTitle.innerHTML = writable ? tabName :
+                    tabName + ' <span class="readonly-badge">| 🔒 قراءة فقط</span>';
+
+                // إظهار زر التحديث فقط للأوراق غير القابلة للكتابة
+                var refreshBtn = this.dom.refreshBtn;
+                if (refreshBtn) {
+                    if (!writable) {
+                        refreshBtn.classList.add('show');
+                    } else {
+                        refreshBtn.classList.remove('show');
+                    }
+                }
+
+                this.dom.tableContainer.innerHTML =
+                    '<div class="empty-state"><div class="empty-icon">⏳</div><p>جاري تحميل البيانات...</p></div>';
+
+                readTab(tabName).then(function(data) {
+                    var headers = data.headers;
+                    var rows = data.rows;
+                    var adjusted = false;
+
+                    // كشف صف العناوين المدمجة: إذا كان الصف الأول يحتوي على خلية أو خليتين فقط
+                    // والصف الثاني يحتوي على 4+ خلايا غير فارغة → الصف الأول عنوان وليس رأس
+                    function countNonEmpty(row) {
+                        var c = 0;
+                        for (var i = 0; i < row.length; i++) {
+                            if (row[i] && row[i].trim() !== '') c++;
+                        }
+                        return c;
+                    }
+                    var firstCount = countNonEmpty(headers);
+                    var secondRow = data.rows && data.rows[0];
+                    var secondCount = secondRow ? countNonEmpty(secondRow) : 0;
+                    if (secondCount > firstCount * 2 && secondCount >= 4) {
+                        // الصف الأول عنوان مدمج → استخدم الصف الثاني كرأس
+                        headers = secondRow;
+                        rows = data.rows.slice(1);
+                        adjusted = true;
+                        console.log('📋', tabName, '→ تم اكتشاف صف عنوان، استخدام الصف الثاني كرأس');
+                    }
+
+                    App.state.headers = headers;
+                    // العثور على أول عمود ذي رأس غير فارغ ضمن النطاق المُرجَع
+                    var emptyOffset = 0;
+                    while (emptyOffset < headers.length &&
+                           (!headers[emptyOffset] || headers[emptyOffset].trim() === '')) {
+                        emptyOffset++;
+                    }
+                    // إجمالي الإزاحة = بداية النطاق + الأعمدة الفارغة في الرأس (للمحاذاة عند الحفظ)
+                    App.state.tabFormat = App.state.tabFormat || {};
+                    App.state.tabFormat[tabName] = {
+                        firstColIndex: (data.startColIndex || 0) + emptyOffset,
+                        emptyOffset: emptyOffset,
+                        adjustedHeaders: adjusted
+                    };
+                    console.log('📋', tabName, 'range:', data.range, 'startCol:', data.startColIndex,
+                                'headers:', JSON.stringify(headers), 'emptyOffset:', emptyOffset,
+                                'firstColIndex:', App.state.tabFormat[tabName].firstColIndex, 'adjusted:', adjusted);
+
+                    // عرض الجدول فورًا بالبيانات
+                    App.renderTable(tabName, headers, rows);
+
+                    // جلب معلومات الدمج والخط في الخلفية ثم إعادة العرض
+                    getSheetFormatData(tabName, data.range).then(function(meta) {
+                        App.state.sheetMeta[tabName] = meta;
+                        App.renderTable(tabName, headers, rows);
+                    }).catch(function(err) {
+                        console.error('تعذر جلب معلومات التنسيق:', err);
+                    });
+                }).catch(function(err) {
+                    console.error('خطأ في تحميل بيانات', tabName, ':', err);
+                    App.dom.tableContainer.innerHTML =
+                        '<div class="empty-state"><div class="empty-icon">⚠️</div>' +
+                        '<p>فشل تحميل البيانات</p>' +
+                        '<p style="font-size:0.85rem;margin-top:0.5rem;color:var(--text-muted);">' +
+                        err.message + '</p></div>';
+                });
+            },
+
+            // عرض الجدول مع دعم الخلايا المدمجة وحجم الخط
+            renderTable: function(tabName, headers, rows) {
+                var writable = isWritable(tabName);
+                this.state.currentHeaders = headers;
+                this.state.currentRows = rows;
+                if (!headers || headers.length === 0) {
+                    var msg = writable ?
+                        'استخدم الزر العائم + لإضافة أول صف' :
+                        'لا توجد بيانات في هذه الورقة';
+                    this.dom.tableContainer.innerHTML =
+                        '<div class="empty-state"><div class="empty-icon">📭</div>' +
+                        '<p>لا توجد بيانات في \'' + tabName + '\'</p>' +
+                        '<p style="font-size:0.85rem;margin-top:0.5rem;color:var(--text-muted);">' +
+                        msg + '</p></div>';
+                    return;
+                }
+
+                // إعداد معلومات الدمج
+                var meta = this.state.sheetMeta && this.state.sheetMeta[tabName];
+                var merges = meta && meta.merges ? meta.merges : [];
+                var fontSizes = meta && meta.fontSizes ? meta.fontSizes : [];
+                var tabFormat = this.state.tabFormat && this.state.tabFormat[tabName] || {};
+                var headerRow = tabFormat.adjustedHeaders ? 1 : 0; // الصف المطلق لرأس الجدول
+                var startColIndex = (tabFormat.firstColIndex || 0) - (tabFormat.emptyOffset || 0);
+                var mergeMap = buildMergeMap(merges);
+                var printable = isPrintable(tabName);
+
+                var html = '<table><thead><tr>';
+                headers.forEach(function(h, ci) {
+                    var absRow = headerRow;
+                    var absCol = ci + startColIndex;
+                    var key = absRow + ',' + absCol;
+                    if (mergeMap.skip[key]) return;
+                    var a = mergeMap.anchors[key];
+                    html += '<th';
+                    if (a) {
+                        html += ' colspan="' + a.colspan + '" rowspan="' + a.rowspan + '"';
+                    }
+                    // حجم الخط لخلية الرأس
+                    var fs = fontSizes[absRow] && fontSizes[absRow][absCol];
+                    if (fs) html += ' style="font-size:' + fs + 'pt"';
+                    html += '>' + h + '</th>';
+                });
+                if(printable) html += '<th class="print-col">طباعة</th>';
+                html += '</tr></thead><tbody>';
+
+                if (rows.length === 0) {
+                    html += '<tr><td colspan="' + headers.length + '" style="text-align:center;color:var(--text-muted);padding:2rem;">' +
+                        'لا توجد بيانات بعد</td></tr>';
+                } else {
+                    rows.forEach(function(row, ri) {
+                        var absRow = headerRow + 1 + ri;
+                        // كشف الصف الذي يحوي خلية مدمجة (أي صف يقع ضمن نطاق دمج)
+                        var hasMerged = false;
+                        if (printable) {
+                            for (var mi = 0; mi < merges.length; mi++) {
+                                var m = merges[mi];
+                                if (m.startRowIndex <= absRow && absRow < m.endRowIndex) {
+                                    hasMerged = true;
+                                    break;
+                                }
+                            }
+                        }
+                        html += '<tr' + (printable && hasMerged ? ' class="printable-row" data-ri="' + ri + '"' : '') + '>';
+                        var cellRendered = false;
+                        headers.forEach(function(h, ci) {
+                            var absCol = ci + startColIndex;
+                            var key = absRow + ',' + absCol;
+                            if (mergeMap.skip[key]) return;
+                            var a = mergeMap.anchors[key];
+                            html += '<td';
+                            if (a) {
+                                html += ' colspan="' + a.colspan + '" rowspan="' + a.rowspan + '"';
+                            }
+                            // حجم الخط للخلية
+                            var fs = fontSizes[absRow] && fontSizes[absRow][absCol];
+                            if (fs) html += ' style="font-size:' + fs + 'pt"';
+                            var content = row[ci] || '';
+                            html += '>' + content + '</td>';
+                        });
+                        if (printable && hasMerged) {
+                            html += '<td class="print-col"><button class="print-row-btn" data-ri="' + ri + '" title="طباعة 3 صفوف معاً">🖨️</button></td>';
+                        }
+                        html += '</tr>';
+                    });
+                }
+
+                html += '</tbody></table>';
+                this.dom.tableContainer.innerHTML = html;
+
+                // ربط حدث النقر على أزرار طباعة الصفوف
+                if (printable) {
+                    this.dom.tableContainer.querySelectorAll('.print-row-btn').forEach(function(btn) {
+                        btn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            var ri = parseInt(this.getAttribute('data-ri'), 10);
+                            if (!isNaN(ri)) {
+                                App.openPrintConfirm(ri);
+                            }
+                        });
+                    });
+                }
+            },
+
+            // ============================================
+            // الجزء 17: نافذة إدخال البيانات
+            // ============================================
+
+            // فتح نافذة الإدخال
+            openEntryForm: async function() {
+                var tabName = this.state.currentTab;
+
+                // حماية: لا تسمح بالكتابة في الأوراق غير القابلة للكتابة
+                if (!tabName || !isWritable(tabName)) {
+                    this.showToast('✋ الكتابة متاحة فقط للأوراق المحددة');
+                    return;
+                }
+
+                var headers = this.state.headers;
+                if (!headers || headers.length === 0) {
+                    this.showToast('لا توجد حقول لإدخال البيانات');
+                    return;
+                }
+
+                var tabFormat = this.state.tabFormat && this.state.tabFormat[tabName] || {};
+                this.state.isEntryOpen = true;
+                this.dom.entryTitle.textContent = 'إضافة بيانات إلى ' + tabName +
+                    (tabFormat.adjustedHeaders ? ' 📋' : '') +
+                    ' [إزاحة:' + (tabFormat.firstColIndex || 0) + ']';
+                this.dom.formFields.innerHTML =
+                    '<div class="empty-state"><div class="empty-icon">⏳</div><p>جاري تحميل الحقول...</p></div>';
+                this.dom.entryModal.classList.add('active');
+
+                // جلب القوائم المنسدلة لكل عمود (إن وُجدت)
+                var dropdowns = [];
+                try {
+                    dropdowns = await getColumnDropdowns(this.state.currentTab);
+                } catch (e) {
+                    console.error('خطأ في جلب القوائم المنسدلة:', e);
+                }
+
+                // توليد الحقول من عناوين الأعمدة (تجاهل الأعمدة الفارغة في بداية الرأس)
+                var emptyOffset = tabFormat.emptyOffset || 0;
+                var visibleHeaders = headers.slice(emptyOffset);
+                var fieldOptions = [];
+                this.dom.formFields.innerHTML = visibleHeaders.map(function(h, i) {
+                    var colIndex = i + emptyOffset;
+                    var dd = dropdowns[colIndex];
+                    if (dd && dd.options && dd.options.length) {
+                        fieldOptions[colIndex] = dd.options;
+                        return '<div class="form-group combobox">' +
+                            '<label for="field-' + colIndex + '">' + h + '</label>' +
+                            '<input type="text" id="field-' + colIndex + '" name="field-' + colIndex + '" ' +
+                            'class="combobox-input" autocomplete="off" ' +
+                            'placeholder="ابحث عن ' + h + '..." required>' +
+                            '<ul class="combobox-list" id="list-' + colIndex + '"></ul>' +
+                            '</div>';
+                    }
+                    return '<div class="form-group">' +
+                        '<label for="field-' + colIndex + '">' + h + '</label>' +
+                        '<input type="text" id="field-' + colIndex + '" name="field-' + colIndex + '" ' +
+                        'placeholder="أدخل ' + h + '" required>' +
+                        '</div>';
+                }).join('');
+
+                // تهيئة القوائم القابلة للبحث
+                this.initComboboxes(fieldOptions);
+
+                // التركيز على أول حقل
+                setTimeout(function() {
+                    var firstInput = App.dom.formFields.querySelector('input');
+                    if (firstInput) firstInput.focus();
+                }, 300);
+            },
+
+            // تهيئة جميع حقول القوائم القابلة للبحث
+            initComboboxes: function(fieldOptions) {
+                fieldOptions.forEach(function(options, i) {
+                    if (!options) return;
+                    var input = document.getElementById('field-' + i);
+                    var list = document.getElementById('list-' + i);
+                    if (input && list) {
+                        initCombobox(input, list, options);
+                    }
+                });
+            },
+
+            // إغلاق نافذة الإدخال
+            closeEntryForm: function() {
+                this.state.isEntryOpen = false;
+                this.dom.entryModal.classList.remove('active');
+            },
+
+            // معالجة إرسال النموذج
+            handleEntrySubmit: function() {
+                var inputs = this.dom.formFields.querySelectorAll('input, select');
+                var values = [];
+                var isValid = true;
+
+                inputs.forEach(function(input) {
+                    var val = input.value.trim();
+                    if (!val) isValid = false;
+                    values.push(val);
+                });
+
+                if (!isValid) {
+                    this.showToast('الرجاء ملء جميع الحقول');
+                    return;
+                }
+
+                var tabName = this.state.currentTab;
+                var self = this;
+                var tabFormat = this.state.tabFormat && this.state.tabFormat[tabName] || {};
+
+                // إضافة قيم فارغة للأعمدة الأولى التي بلا رأس (للمحاذاة الصحيحة)
+                var padCount = tabFormat.firstColIndex || 0;
+                for (var p = 0; p < padCount; p++) {
+                    values.unshift('');
+                }
+
+                this.showToast('جاري الحفظ...');
+
+                appendRow(tabName, values).then(function() {
+                    self.showToast('✅ تمت إضافة البيانات بنجاح');
+                    self.closeEntryForm();
+                    // إعادة تحميل البيانات الحالية
+                    self.loadTabData(tabName);
+                    // تحديث الأوراق التي تحتوي صيغًا في الخلفية
+                    self.refreshFormulaSheets();
+                }).catch(function(err) {
+                    console.error('خطأ في الحفظ:', err);
+                    self.showToast('❌ فشل الحفظ: ' + err.message);
+                });
+            },
+
+            // تحديث الأوراق التي تحتوي صيغًا (غير القابلة للكتابة) في الخلفية
+            refreshFormulaSheets: function() {
+                var self = this;
+                self.state.tabs.forEach(function(t) {
+                    if (!isWritable(t)) {
+                        readTab(t).then(function(data) {
+                            // إذا كنا نعرض هذه الورقة حاليًا، قم بتحديث العرض فورًا
+                            if (self.state.currentTab === t) {
+                                self.state.headers = data.headers;
+                                self.renderTable(t, data.headers, data.rows);
+                            }
+                        }).catch(function() {});
+                    }
+                });
+            },
+
+            // إعادة تحميل بيانات التبويب الحالي يدويًا
+            refreshCurrentTab: function() {
+                var tab = this.state.currentTab;
+                if (tab) {
+                    this.showToast('جاري تحديث البيانات...');
+                    this.loadTabData(tab);
+                }
+            },
+
+            // ============================================
+            // الجزء 17ب: طباعة الصف المحدد
+            // ============================================
+
+            // فتح رسالة تأكيد الطباعة لصف معين
+            openPrintConfirm: function(ri) {
+                var tabName = this.state.currentTab;
+                if (!tabName) return;
+                this.state.pendingPrintRow = ri;
+                this.dom.printConfirmSheet.textContent = tabName;
+                this.dom.printConfirmModal.classList.add('active');
+            },
+
+            // إغلاق رسالة تأكيد الطباعة
+            closePrintConfirm: function() {
+                this.state.pendingPrintRow = null;
+                this.dom.printConfirmModal.classList.remove('active');
+            },
+
+            // تنفيذ الطباعة عبر إعدادات الطباعة في النظام (أندرويد/ويندوز)
+            doPrint: function() {
+                var ri = this.state.pendingPrintRow;
+                if (ri === null || ri === undefined) return;
+                var tabName = this.state.currentTab;
+                var headers = this.state.currentHeaders || [];
+
+                // طباعة كل 3 صفوف معاً: المجموعة التي ينتمي إليها الصف المختار
+                var GROUP_SIZE = 3;
+                var start = Math.floor(ri / GROUP_SIZE) * GROUP_SIZE;
+                var rowsGroup = [];
+                for (var i = start; i < start + GROUP_SIZE; i++) {
+                    if (this.state.currentRows && this.state.currentRows[i]) {
+                        rowsGroup.push(this.state.currentRows[i]);
+                    }
+                }
+
+                this.closePrintConfirm();
+
+                this.dom.printDoc.innerHTML = this.buildPrintDocument(tabName, headers, rowsGroup);
+                this.showToast('🖨️ جاري فتح إعدادات الطباعة...');
+
+                // إتاحة الوقت لملء المحتوى ثم فتح إعدادات الطباعة في النظام
+                setTimeout(function() {
+                    window.print();
+                }, 250);
+            },
+
+            // بناء وثيقة الطباعة (منقولة: الأعمدة تصبح صفوفاً لتناسب ورق 80مم)
+            buildPrintDocument: function(tabName, headers, rowsGroup) {
+                var now = new Date();
+                var dateStr = now.toLocaleDateString('ar-EG', {
+                    year: 'numeric', month: 'long', day: 'numeric'
+                });
+                var timeStr = now.toLocaleTimeString('ar-EG', {
+                    hour: '2-digit', minute: '2-digit'
+                });
+
+                // نقل الجدول: كل عمود يصبح صفاً [اسم العمود | قيمة الصف1 | قيمة الصف2 | قيمة الصف3]
+                var bodyRows = '';
+                var any = false;
+                (headers || []).forEach(function(h, ci) {
+                    if (!h || !String(h).trim()) return;
+                    var tds = '';
+                    (rowsGroup || []).forEach(function(values) {
+                        var v = (values && values[ci] !== undefined && values[ci] !== null) ? values[ci] : '';
+                        if (String(v).trim() !== '') any = true;
+                        tds += '<td>' + escapeHtml(v) + '</td>';
+                    });
+                    bodyRows += '<tr><th>' + escapeHtml(h) + '</th>' + tds + '</tr>';
+                });
+
+                if (!any) {
+                    return '<div class="print-title">' + escapeHtml(tabName) + '</div>' +
+                        '<p style="text-align:center;margin-top:1rem;">لا توجد بيانات للطباعة</p>';
+                }
+
+                return '<div class="print-title">' + escapeHtml(tabName) + '</div>' +
+                    '<div class="print-meta"><span>تاريخ الطباعة: ' + escapeHtml(dateStr) +
+                    ' — ' + escapeHtml(timeStr) + '</span></div>' +
+                    '<table><tbody>' + bodyRows + '</tbody></table>';
+            },
+
+            // ============================================
+            // الجزء 18: الإشعارات
+            // ============================================
+
+            _toastTimer: null,
+
+            showToast: function(msg) {
+                if (this._toastTimer) {
+                    clearTimeout(this._toastTimer);
+                }
+
+                this.dom.toast.textContent = msg;
+                this.dom.toast.classList.add('show');
+
+                this._toastTimer = setTimeout(function() {
+                    App.dom.toast.classList.remove('show');
+                }, 3000);
+            },
+
+            // ============================================
+            // الجزء 19: بدء التطبيق
+            // ============================================
+
+            init: function() {
+                this.cacheDom();
+                this.bindEvents();
+
+                // عند فشل تحميل الخلفية bg.png، استخدم لون أسود عادي
+                var bgImg = new Image();
+                bgImg.onerror = function() {
+                    document.getElementById('logo-screen').style.background = 'var(--black)';
+                };
+                bgImg.src = 'bg.png';
+            }
+        };
+
+        // بدء التطبيق عند تحميل الصفحة
+        window.addEventListener('DOMContentLoaded', function() {
+            App.init();
+        });
+    </script>
+</body>
+</html>
