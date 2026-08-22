@@ -362,7 +362,10 @@
             border-radius: var(--radius);
             overflow: hidden;
             max-width: 100%;
+            /* تمرير داخلي لتجميد رأس الجدول فوقه */
+            max-height: calc(100vh - 170px);
             overflow-x: auto;
+            overflow-y: auto;
         }
 
         .table-glass table {
@@ -372,12 +375,24 @@
         }
 
         .table-glass th {
-            background: rgba(212, 175, 55, 0.1);
+            /* تجميد السطر الأول (رأس الجدول) أثناء التمرير */
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            /* لون صلب حتى لا تظهر الصفوف المارة خلفه */
+            background: #262114;
             color: var(--gold);
             padding: 1rem 1.2rem;
             text-align: right;
             font-weight: 600;
             white-space: nowrap;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.35);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+        }
+
+        /* عمود الطباعة المجمّد يظل شفاف الحدود كالرأس */
+        .table-glass th.print-col {
+            background: #262114;
         }
 
         .table-glass td {
