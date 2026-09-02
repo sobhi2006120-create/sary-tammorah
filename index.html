@@ -141,6 +141,31 @@
             50% { opacity: 1; }
         }
 
+        .down-indicator {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            cursor: pointer;
+            z-index: 3;
+            opacity: 0.9;
+            animation: downBounce 1.6s ease-in-out infinite;
+            filter: drop-shadow(0 0 10px var(--gold-glow));
+        }
+
+        .down-indicator img {
+            display: block;
+            width: 280px;
+            max-width: 60vw;
+            height: auto;
+            border-radius: 16px;
+        }
+
+        @keyframes downBounce {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(10px); }
+        }
+
         /* ==========================================
            الجزء 3: شاشة التطبيق الرئيسية
            ========================================== */
@@ -863,6 +888,7 @@
            ========================================== */
         @media (max-width: 600px) {
             .logo-img { width: 200px; }
+            .down-indicator img { width: 200px; }
             .tabs-grid { grid-template-columns: 1fr; }
             .table-glass { font-size: 0.85rem; }
             .table-glass th,
@@ -884,6 +910,9 @@
             <div class="logo-ring"></div>
             <img src="logo.png" alt="صاري 5.0" class="logo-img" id="logo-img">
             <div class="logo-hint">⏎ اضغط لفتح جداول البيانات</div>
+        </div>
+        <div class="down-indicator" id="down-indicator" title="اضغط للفتح">
+            <img src="down.png" alt="down" style="width:280px;max-width:60vw;height:auto;object-fit:contain;display:block;border-radius:16px;">
         </div>
     </div>
 
@@ -1384,7 +1413,8 @@
                     printCancelBtn: document.getElementById('print-cancel-btn'),
                     printConfirmBtn: document.getElementById('print-confirm-btn'),
                     printConfirmSheet: document.getElementById('print-confirm-sheet'),
-                    printDoc: document.getElementById('print-doc')
+                    printDoc: document.getElementById('print-doc'),
+                    downIndicator: document.getElementById('down-indicator')
                 };
             },
 
@@ -1394,6 +1424,13 @@
                 this.dom.logoContainer.addEventListener('click', function() {
                     App.openApp();
                 });
+
+                // فتح التطبيق عند النقر على سهم النزول
+                if (this.dom.downIndicator) {
+                    this.dom.downIndicator.addEventListener('click', function() {
+                        App.openApp();
+                    });
+                }
 
                 // العودة لشاشة التبويبات
                 this.dom.backBtn.addEventListener('click', function() {
