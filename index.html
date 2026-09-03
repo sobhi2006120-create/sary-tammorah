@@ -620,6 +620,28 @@
             position: relative;
         }
 
+        .combobox-input[readonly] {
+            cursor: pointer;
+            background: rgba(45, 45, 30, 0.9);
+        }
+
+        .field-error {
+            border-color: #ff4d4d !important;
+            box-shadow: 0 0 8px rgba(255,77,77,0.45) !important;
+        }
+
+        .field-error-msg {
+            display: none;
+            color: #ff6b6b;
+            font-size: 0.78rem;
+            margin-top: 4px;
+            line-height: 1.2;
+        }
+
+        .field-error-msg.show {
+            display: block;
+        }
+
         .combobox-list {
             position: absolute;
             top: calc(100% + 4px);
@@ -1207,11 +1229,39 @@
                 .replace(/'/g, '&#39;');
         }
 
-        // تهيئة مكوّن القائمة القابلة للبحث (Combobox)
+        // تهيئة مكوّن القائمة القابلة للبحث (Combobox) - مع تحقق وشارة خطأ
         function initCombobox(input, list, options) {
             var filtered = options.slice();
             var activeIndex = -1;
             var explicitlySelected = false;
+
+            // عنصر رسالة الخطأ
+            var group = input.closest('.form-group');
+            var errorEl = group ? group.querySelector('.field-error-msg') : null;
+            if (!errorEl && group) {
+                errorEl = document.createElement('span');
+                errorEl.className = 'field-error-msg';
+                errorEl.textContent = '⚠️ قيمة غير موجودة في القائمة';
+                group.appendChild(errorEl);
+            }
+
+            function isExactMatch(val) {
+                var t = String(val).trim();
+                for (var i = 0; i < options.length; i++) {
+                    if (String(options[i]).trim() === t) return true;
+                }
+                return false;
+            }
+
+            function setError() {
+                input.classList.add('field-error');
+                if (errorEl) errorEl.classList.add('show');
+            }
+
+            function clearError() {
+                input.classList.remove('field-error');
+                if (errorEl) errorEl.classList.remove('show');
+            }
 
             function render() {
                 if (!filtered.length) {
@@ -1236,27 +1286,49 @@
 
             function filter() {
                 var q = input.value.trim().toLowerCase();
-                filtered = options.filter(function(o) {
-                    return String(o).toLowerCase().indexOf(q) !== -1;
-                });
+                if (q === '') {
+                    filtered = options.slice();
+                } else {
+                    filtered = options.filter(function(o) {
+                        return String(o).toLowerCase().indexOf(q) !== -1;
+                    });
+                }
                 activeIndex = filtered.length ? 0 : -1;
                 render();
             }
 
             input.addEventListener('input', function() {
                 explicitlySelected = false;
+                clearError();
                 filter();
             });
-            input.addEventListener('focus', filter);
 
-            // عند الخروج من الحقل دون اختيار: اختر أول اقتراح معروض
+            input.addEventListener('focus', function() {
+                clearError();
+                filter();
+            });
+
+            // عند الانتقال للخلية التالية: تعبئة أقرب اختيار أو إظهار شارة خطأ
             input.addEventListener('blur', function() {
                 setTimeout(function() {
-                    if (!explicitlySelected && filtered.length) {
+                    var val = input.value.trim();
+                    if (val === '') {
+                        clearError();
+                        list.classList.remove('show');
+                        return;
+                    }
+                    if (isExactMatch(val)) {
+                        clearError();
+                    } else if (filtered.length) {
+                        // كتابة أقرب اختيار تلقائياً
                         input.value = filtered[0];
+                        explicitlySelected = true;
+                        clearError();
+                    } else {
+                        setError();
                     }
                     list.classList.remove('show');
-                }, 120);
+                }, 140);
             });
 
             // النقر على عنصر (قبل حدث blur لالتقاط القيمة)
@@ -1266,6 +1338,7 @@
                     e.preventDefault();
                     input.value = item.getAttribute('data-val');
                     explicitlySelected = true;
+                    clearError();
                     list.classList.remove('show');
                     input.focus();
                 }
@@ -1286,6 +1359,7 @@
                         e.preventDefault();
                         input.value = filtered[activeIndex];
                         explicitlySelected = true;
+                        clearError();
                         list.classList.remove('show');
                     }
                 } else if (e.key === 'Escape') {
@@ -1839,6 +1913,7 @@
                             'class="combobox-input" autocomplete="off" ' +
                             'placeholder="ابحث عن ' + h + '..." required>' +
                             '<ul class="combobox-list" id="list-' + colIndex + '"></ul>' +
+                            '<span class="field-error-msg">⚠️ قيمة غير موجودة في القائمة</span>' +
                             '</div>';
                     }
                     return '<div class="form-group">' +
@@ -1847,6 +1922,9 @@
                         'placeholder="أدخل ' + h + '" required>' +
                         '</div>';
                 }).join('');
+
+                // حفظ للتحقق لاحقاً في الصفحات المقيّدة
+                this.state._lastFieldOptions = fieldOptions;
 
                 // تهيئة القوائم القابلة للبحث
                 this.initComboboxes(fieldOptions);
@@ -1881,12 +1959,40 @@
                 var inputs = this.dom.formFields.querySelectorAll('input, select');
                 var values = [];
                 var isValid = true;
+                var hasFieldError = false;
+
+                var cachedOpts = this.state._lastFieldOptions || [];
 
                 inputs.forEach(function(input) {
                     var val = input.value.trim();
                     if (!val) isValid = false;
+                    // تحقق: الحقول المرتبطة بقائمة يجب أن تكون قيمتها مطابقة تماماً لأحد خياراتها
+                    var m = input.id.match(/field-(\d+)/);
+                    var cIdx = m ? parseInt(m[1], 10) : -1;
+                    var opts = (cIdx >= 0) ? cachedOpts[cIdx] : null;
+                    if (opts && Array.isArray(opts) && opts.length) {
+                        var exact = false;
+                        for (var k = 0; k < opts.length; k++) {
+                            if (String(opts[k]).trim() === val) { exact = true; break; }
+                        }
+                        if (!exact && val !== '') {
+                            isValid = false;
+                            hasFieldError = true;
+                            input.classList.add('field-error');
+                            var grp = input.closest('.form-group');
+                            var msg = grp ? grp.querySelector('.field-error-msg') : null;
+                            if (msg) msg.classList.add('show');
+                        }
+                    }
                     values.push(val);
                 });
+
+                // لا يتم الإرسال إذا وُجدت شارة خطأ في أي خلية
+                var errorGroups = this.dom.formFields.querySelectorAll('.field-error');
+                if (errorGroups.length) {
+                    this.showToast('⚠️ صحح الحقول المشار إليها — قيمة غير موجودة في القائمة');
+                    return;
+                }
 
                 if (!isValid) {
                     this.showToast('الرجاء ملء جميع الحقول');
