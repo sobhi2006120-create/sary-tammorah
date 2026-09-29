@@ -706,6 +706,60 @@
         }
 
         /* ==========================================
+           الجزء 8ب: أزرار التعديل والحذف
+           ========================================== */
+        .action-col { width:100px; text-align:center; white-space:nowrap; }
+        .edit-row-btn, .delete-row-btn { border:1px solid var(--glass-border); background:var(--glass-bg); border-radius:8px; padding:5px 10px; cursor:pointer; backdrop-filter:blur(8px); transition:all .2s; margin:0 2px; }
+        .edit-row-btn { color:#4CAF50; }
+        .edit-row-btn:hover { border-color:#4CAF50; background:rgba(76,175,80,.15); box-shadow:0 0 10px rgba(76,175,80,.3); }
+        .delete-row-btn { color:#f44336; }
+        .delete-row-btn:hover { border-color:#f44336; background:rgba(244,67,54,.15); box-shadow:0 0 10px rgba(244,67,54,.3); }
+        .table-glass th.action-col { background:#262114; }
+
+        /* ==========================================
+           الجزء 8ج: نافذة تأكيد الحذف
+           ========================================== */
+        .delete-confirm-btn { background:linear-gradient(135deg,#f44336,#d32f2f); color:#fff; }
+        .delete-confirm-btn:hover { transform:translateY(-2px); box-shadow:0 5px 20px rgba(244,67,54,.4); }
+
+        /* ==========================================
+           الجزء 8د: زر مرجع المهمة
+           ========================================== */
+        .fab-task {
+            position: fixed;
+            bottom: 100px;
+            left: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid #2196F3;
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            color: #2196F3;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(33,150,243,.2);
+        }
+        .fab-task.active { display: flex; }
+        .fab-task:hover { transform:scale(1.1); box-shadow:0 4px 30px rgba(33,150,243,.4); background:#2196F3; color:var(--black); }
+
+        /* ==========================================
+           الجزء 8هـ: نافذة مرجع المهمة
+           ========================================== */
+        .task-options { display:flex; flex-direction:column; gap:1rem; }
+        .task-option-btn { padding:1rem; border-radius:var(--radius-sm); border:1px solid var(--glass-border); background:rgba(36,36,36,.8); color:var(--text); cursor:pointer; transition:all .3s ease; font-family:inherit; font-size:1rem; display:flex; align-items:center; gap:.8rem; }
+        .task-option-btn:hover { border-color:var(--gold); background:rgba(212,175,55,.1); transform:translateY(-2px); }
+        .task-option-btn .task-icon { font-size:1.5rem; }
+        .task-option-btn .task-label { flex:1; text-align:right; }
+        .task-option-btn .task-desc { font-size:.8rem; color:var(--text-muted); }
+
+        /* ==========================================
            الجزء 9: إشعارات Toast
            ========================================== */
         .toast {
@@ -969,6 +1023,50 @@
     <!-- الزر العائم -->
     <button class="fab" id="fab-btn">+</button>
 
+    <!-- زر مرجع المهمة -->
+    <button class="fab-task" id="fab-task-btn" title="مرجع المهمة">📋</button>
+
+    <!-- نافذة مرجع المهمة -->
+    <div class="modal-overlay" id="task-modal">
+        <div class="modal-glass">
+            <div class="modal-header">
+                <h2>📋 مرجع المهمة</h2>
+                <button type="button" class="close-modal" id="close-task-btn">✕</button>
+            </div>
+            <div class="task-options">
+                <button class="task-option-btn" id="add-customer-btn">
+                    <span class="task-icon">👤</span>
+                    <span class="task-label">
+                        <div>اضافة زبون</div>
+                        <div class="task-desc">يضيف البيانات في آخر خلية فارغة في عمود L</div>
+                    </span>
+                </button>
+                <button class="task-option-btn" id="add-worker-btn">
+                    <span class="task-icon">👷</span>
+                    <span class="task-label">
+                        <div>اضافة عامل</div>
+                        <div class="task-desc">يضيف البيانات في آخر خلية فارغة في عمود J</div>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة تأكيد الحذف -->
+    <div class="modal-overlay" id="delete-confirm-modal">
+        <div class="modal-glass">
+            <div class="modal-header">
+                <h2>🗑️ تأكيد الحذف</h2>
+                <button type="button" class="close-modal" id="close-delete-confirm-btn">✕</button>
+            </div>
+            <p class="confirm-msg">هل أنت متأكد من حذف هذا الصف؟<br><strong>لا يمكن التراجع عن هذا الإجراء.</strong></p>
+            <div class="confirm-actions">
+                <button type="button" class="confirm-btn cancel" id="delete-cancel-btn">إلغاء</button>
+                <button type="button" class="confirm-btn delete-confirm-btn" id="delete-confirm-btn">حذف</button>
+            </div>
+        </div>
+    </div>
+
     <!-- نافذة الإدخال -->
     <div class="modal-overlay" id="entry-modal">
         <div class="modal-glass">
@@ -1152,6 +1250,125 @@
                 'values/' + encodeURIComponent(tabName) + '!A:Z:append?valueInputOption=USER_ENTERED',
                 { values: [values] }
             );
+        }
+
+        // تحديث صف موجود
+        async function updateRow(tabName, rowIndex, values) {
+            var token = await getAccessToken();
+            // حساب الصف الفعلي في Google Sheets (مع مراعاة صف العنوان)
+            var sheetRow = rowIndex + 2; // +1 للفهرس، +1 لصف العنوان
+            var res = await fetch(
+                'https://sheets.googleapis.com/v4/spreadsheets/' +
+                CONFIG.spreadsheedId + '/values/' + encodeURIComponent(tabName) + '!A' + sheetRow + ':Z' + sheetRow + '?valueInputOption=USER_ENTERED', {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ values: [values] })
+                }
+            );
+            if (!res.ok) {
+                var errText = await res.text();
+                throw new Error(errText);
+            }
+            return res.json();
+        }
+
+        // حذف صف
+        async function deleteRow(tabName, rowIndex) {
+            var token = await getAccessToken();
+            // حساب الصف الفعلي في Google Sheets (مع مراعاة صف العنوان)
+            var sheetRow = rowIndex + 2; // +1 للفهرس، +1 لصف العنوان
+
+            // الحصول على sheetId أولاً
+            var infoRes = await fetch(
+                'https://sheets.googleapis.com/v4/spreadsheets/' +
+                CONFIG.spreadsheedId + '?fields=sheets.properties.sheetId,sheets.properties.title', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                }
+            );
+            if (!infoRes.ok) {
+                var errText = await infoRes.text();
+                throw new Error(errText);
+            }
+            var infoData = await infoRes.json();
+            var sheetId = null;
+            for (var i = 0; i < infoData.sheets.length; i++) {
+                if (infoData.sheets[i].properties.title === tabName) {
+                    sheetId = infoData.sheets[i].properties.sheetId;
+                    break;
+                }
+            }
+            if (sheetId === null) {
+                throw new Error('لم يتم العثور على الورقة');
+            }
+
+            // حذف الصف فعلياً باستخدام batchUpdate
+            var res = await fetch(
+                'https://sheets.googleapis.com/v4/spreadsheets/' +
+                CONFIG.spreadsheedId + ':batchUpdate', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        requests: [{
+                            deleteDimension: {
+                                range: {
+                                    sheetId: sheetId,
+                                    dimension: 'ROWS',
+                                    startIndex: sheetRow - 1,
+                                    endIndex: sheetRow
+                                }
+                            }
+                        }]
+                    })
+                }
+            );
+            if (!res.ok) {
+                var errText = await res.text();
+                throw new Error(errText);
+            }
+            return res.json();
+        }
+
+        // إضافة قيمة في عمود محدد (L أو J)
+        async function appendToColumn(tabName, columnLetter, value) {
+            var token = await getAccessToken();
+            // أولاً نقرأ العمود لمعرفة آخر خلية فارغة
+            var res = await fetch(
+                'https://sheets.googleapis.com/v4/spreadsheets/' +
+                CONFIG.spreadsheedId + '/values/' + encodeURIComponent(tabName) + '!' + columnLetter + ':' + columnLetter, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                }
+            );
+            if (!res.ok) {
+                var errText = await res.text();
+                throw new Error(errText);
+            }
+            var data = await res.json();
+            var values = data.values || [];
+            var lastRow = values.length + 1;
+
+            // نضيف القيمة في الصف التالي
+            var res2 = await fetch(
+                'https://sheets.googleapis.com/v4/spreadsheets/' +
+                CONFIG.spreadsheedId + '/values/' + encodeURIComponent(tabName) + '!' + columnLetter + lastRow + '?valueInputOption=USER_ENTERED', {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ values: [[value]] })
+                }
+            );
+            if (!res2.ok) {
+                var errText = await res2.text();
+                throw new Error(errText);
+            }
+            return res2.json();
         }
 
         // جلب معلومات الدمج والخط من جدول البيانات
@@ -1454,7 +1671,9 @@
                 sheetMeta: {},           // معلومات التنسيق المخبأة لكل ورقة {‎tabName: {merges, fontSizes}}
                 currentHeaders: [],      // عناوين الأعمدة المعروضة حالياً
                 currentRows: [],         // صفوف البيانات المعروضة حالياً
-                pendingPrintRow: null    // رقم الصف المحدد للطباعة
+                pendingPrintRow: null,   // رقم الصف المحدد للطباعة
+                editingRowIndex: null,   // رقم الصف قيد التعديل
+                deletingRowIndex: null    // رقم الصف المراد حذفه
             },
 
             // مراجع عناصر DOM
@@ -1488,7 +1707,16 @@
                     printConfirmBtn: document.getElementById('print-confirm-btn'),
                     printConfirmSheet: document.getElementById('print-confirm-sheet'),
                     printDoc: document.getElementById('print-doc'),
-                    downIndicator: document.getElementById('down-indicator')
+                    downIndicator: document.getElementById('down-indicator'),
+                    fabTask: document.getElementById('fab-task-btn'),
+                    taskModal: document.getElementById('task-modal'),
+                    closeTaskBtn: document.getElementById('close-task-btn'),
+                    addCustomerBtn: document.getElementById('add-customer-btn'),
+                    addWorkerBtn: document.getElementById('add-worker-btn'),
+                    deleteConfirmModal: document.getElementById('delete-confirm-modal'),
+                    closeDeleteConfirmBtn: document.getElementById('close-delete-confirm-btn'),
+                    deleteCancelBtn: document.getElementById('delete-cancel-btn'),
+                    deleteConfirmBtn: document.getElementById('delete-confirm-btn')
                 };
             },
 
@@ -1559,7 +1787,56 @@
                 // إرسال نموذج الإدخال
                 this.dom.entryForm.addEventListener('submit', function(e) {
                     e.preventDefault();
-                    App.handleEntrySubmit();
+                    if (App.state.editingRowIndex !== undefined && App.state.editingRowIndex !== null) {
+                        App.handleEditSubmit();
+                    } else {
+                        App.handleEntrySubmit();
+                    }
+                });
+
+                // زر مرجع المهمة
+                this.dom.fabTask.addEventListener('click', function() {
+                    App.openTaskModal();
+                });
+
+                // إغلاق نافذة مرجع المهمة
+                this.dom.closeTaskBtn.addEventListener('click', function() {
+                    App.closeTaskModal();
+                });
+
+                // إضافة زبون
+                this.dom.addCustomerBtn.addEventListener('click', function() {
+                    App.addCustomer();
+                });
+
+                // إضافة عامل
+                this.dom.addWorkerBtn.addEventListener('click', function() {
+                    App.addWorker();
+                });
+
+                // إغلاق نافذة مرجع المهمة بالنقر خارجها
+                this.dom.taskModal.addEventListener('click', function(e) {
+                    if (e.target === App.dom.taskModal) {
+                        App.closeTaskModal();
+                    }
+                });
+
+                // إغلاق نافذة تأكيد الحذف
+                this.dom.closeDeleteConfirmBtn.addEventListener('click', function() {
+                    App.closeDeleteConfirm();
+                });
+                this.dom.deleteCancelBtn.addEventListener('click', function() {
+                    App.closeDeleteConfirm();
+                });
+                this.dom.deleteConfirmBtn.addEventListener('click', function() {
+                    App.confirmDelete();
+                });
+
+                // إغلاق نافذة تأكيد الحذف بالنقر خارجها
+                this.dom.deleteConfirmModal.addEventListener('click', function(e) {
+                    if (e.target === App.dom.deleteConfirmModal) {
+                        App.closeDeleteConfirm();
+                    }
                 });
 
                 // إغلاق النوافذ بـ Escape
@@ -1597,6 +1874,7 @@
                 this.dom.contentSection.classList.remove('active');
                 this.dom.tabsSection.classList.remove('hidden');
                 this.dom.fab.classList.remove('active');
+                this.dom.fabTask.classList.remove('active');
                 this.state.currentTab = null;
             },
 
@@ -1606,6 +1884,7 @@
                 this.dom.contentSection.classList.remove('active');
                 this.dom.contentSection.classList.add('hidden');
                 this.dom.fab.classList.remove('active');
+                this.dom.fabTask.classList.remove('active');
                 this.state.currentTab = null;
             },
 
@@ -1622,6 +1901,13 @@
                     this.dom.fab.classList.add('active');
                 } else {
                     this.dom.fab.classList.remove('active');
+                }
+
+                // إظهار زر مرجع المهمة فقط في صفحة "مرجع مهمته"
+                if (tabName && tabName.indexOf('مرجع') !== -1) {
+                    this.dom.fabTask.classList.add('active');
+                } else {
+                    this.dom.fabTask.classList.remove('active');
                 }
 
                 this.loadTabData(tabName);
@@ -1801,6 +2087,7 @@
                     html += '>' + h + '</th>';
                 });
                 if(printable) html += '<th class="print-col">طباعة</th>';
+                if(writable) html += '<th class="action-col">إجراءات</th>';
                 html += '</tr></thead><tbody>';
 
                 if (rows.length === 0) {
@@ -1840,6 +2127,12 @@
                         if (printable && hasMerged) {
                             html += '<td class="print-col"><button class="print-row-btn" data-ri="' + ri + '" title="طباعة 3 صفوف معاً">🖨️</button></td>';
                         }
+                        if (writable) {
+                            html += '<td class="action-col">' +
+                                '<button class="edit-row-btn" data-ri="' + ri + '" title="تعديل">✏️</button>' +
+                                '<button class="delete-row-btn" data-ri="' + ri + '" title="حذف">🗑️</button>' +
+                                '</td>';
+                        }
                         html += '</tr>';
                     });
                 }
@@ -1855,6 +2148,28 @@
                             var ri = parseInt(this.getAttribute('data-ri'), 10);
                             if (!isNaN(ri)) {
                                 App.openPrintConfirm(ri);
+                            }
+                        });
+                    });
+                }
+
+                // ربط حدث النقر على أزرار التعديل والحذف
+                if (writable) {
+                    this.dom.tableContainer.querySelectorAll('.edit-row-btn').forEach(function(btn) {
+                        btn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            var ri = parseInt(this.getAttribute('data-ri'), 10);
+                            if (!isNaN(ri)) {
+                                App.openEditForm(ri);
+                            }
+                        });
+                    });
+                    this.dom.tableContainer.querySelectorAll('.delete-row-btn').forEach(function(btn) {
+                        btn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            var ri = parseInt(this.getAttribute('data-ri'), 10);
+                            if (!isNaN(ri)) {
+                                App.openDeleteConfirm(ri);
                             }
                         });
                     });
@@ -1954,6 +2269,47 @@
                 this.dom.entryModal.classList.remove('active');
             },
 
+            // معالجة إرسال التعديل
+            handleEditSubmit: function() {
+                var inputs = this.dom.formFields.querySelectorAll('input, select');
+                var values = [];
+                var isValid = true;
+
+                inputs.forEach(function(input) {
+                    var val = input.value.trim();
+                    if (!val) isValid = false;
+                    values.push(val);
+                });
+
+                if (!isValid) {
+                    this.showToast('الرجاء ملء جميع الحقول');
+                    return;
+                }
+
+                var tabName = this.state.currentTab;
+                var ri = this.state.editingRowIndex;
+                var self = this;
+                var tabFormat = this.state.tabFormat && this.state.tabFormat[tabName] || {};
+
+                // إضافة قيم فارغة للأعمدة الأولى التي بلا رأس (للمحاذاة الصحيحة)
+                var padCount = tabFormat.firstColIndex || 0;
+                for (var p = 0; p < padCount; p++) {
+                    values.unshift('');
+                }
+
+                this.showToast('جاري الحفظ...');
+
+                updateRow(tabName, ri, values).then(function() {
+                    self.showToast('✅ تم التعديل بنجاح');
+                    self.closeEntryForm();
+                    self.state.editingRowIndex = null;
+                    self.loadTabData(tabName);
+                }).catch(function(err) {
+                    console.error('خطأ في التعديل:', err);
+                    self.showToast('❌ فشل التعديل: ' + err.message);
+                });
+            },
+
             // معالجة إرسال النموذج
             handleEntrySubmit: function() {
                 var inputs = this.dom.formFields.querySelectorAll('input, select');
@@ -2021,6 +2377,170 @@
                 }).catch(function(err) {
                     console.error('خطأ في الحفظ:', err);
                     self.showToast('❌ فشل الحفظ: ' + err.message);
+                });
+            },
+
+            // ============================================
+            // الجزء 17ج: تعديل وحذف الصفوف
+            // ============================================
+
+            // فتح نافذة التعديل
+            openEditForm: async function(ri) {
+                var tabName = this.state.currentTab;
+                var row = this.state.currentRows[ri];
+                if (!row) return;
+
+                this.state.editingRowIndex = ri;
+                this.state.isEntryOpen = true;
+                this.dom.entryTitle.textContent = 'تعديل البيانات في ' + tabName;
+                this.dom.formFields.innerHTML =
+                    '<div class="empty-state"><div class="empty-icon">⏳</div><p>جاري تحميل الحقول...</p></div>';
+                this.dom.entryModal.classList.add('active');
+
+                var headers = this.state.headers;
+                var tabFormat = this.state.tabFormat && this.state.tabFormat[tabName] || {};
+                var emptyOffset = tabFormat.emptyOffset || 0;
+                var visibleHeaders = headers.slice(emptyOffset);
+
+                // جلب القوائم المنسدلة لكل عمود (إن وُجدت)
+                var dropdowns = [];
+                try {
+                    dropdowns = await getColumnDropdowns(tabName);
+                } catch (e) {
+                    console.error('خطأ في جلب القوائم المنسدلة:', e);
+                }
+
+                var fieldOptions = [];
+                this.dom.formFields.innerHTML = visibleHeaders.map(function(h, i) {
+                    var colIndex = i + emptyOffset;
+                    var val = row[colIndex] || '';
+                    var dd = dropdowns[colIndex];
+                    if (dd && dd.options && dd.options.length) {
+                        fieldOptions[colIndex] = dd.options;
+                        return '<div class="form-group combobox">' +
+                            '<label for="field-' + colIndex + '">' + h + '</label>' +
+                            '<input type="text" id="field-' + colIndex + '" name="field-' + colIndex + '" ' +
+                            'class="combobox-input" autocomplete="off" ' +
+                            'value="' + escapeHtml(val) + '" placeholder="ابحث عن ' + h + '" required>' +
+                            '<ul class="combobox-list" id="list-' + colIndex + '"></ul>' +
+                            '<span class="field-error-msg">⚠️ قيمة غير موجودة في القائمة</span>' +
+                            '</div>';
+                    }
+                    return '<div class="form-group">' +
+                        '<label for="field-' + colIndex + '">' + h + '</label>' +
+                        '<input type="text" id="field-' + colIndex + '" name="field-' + colIndex + '" ' +
+                        'value="' + escapeHtml(val) + '" placeholder="أدخل ' + h + '" required>' +
+                        '</div>';
+                }).join('');
+
+                // حفظ للتحقق لاحقاً
+                this.state._lastFieldOptions = fieldOptions;
+
+                // تهيئة القوائم القابلة للبحث
+                this.initComboboxes(fieldOptions);
+
+                setTimeout(function() {
+                    var firstInput = App.dom.formFields.querySelector('input');
+                    if (firstInput) firstInput.focus();
+                }, 300);
+            },
+
+            // فتح نافذة تأكيد الحذف
+            openDeleteConfirm: function(ri) {
+                this.state.deletingRowIndex = ri;
+                this.dom.deleteConfirmModal.classList.add('active');
+            },
+
+            // إغلاق نافذة تأكيد الحذف
+            closeDeleteConfirm: function() {
+                this.state.deletingRowIndex = null;
+                this.dom.deleteConfirmModal.classList.remove('active');
+            },
+
+            // تنفيذ الحذف
+            confirmDelete: function() {
+                var ri = this.state.deletingRowIndex;
+                if (ri === null || ri === undefined) return;
+                var tabName = this.state.currentTab;
+                var self = this;
+
+                this.closeDeleteConfirm();
+                this.showToast('جاري الحذف...');
+
+                deleteRow(tabName, ri).then(function() {
+                    self.showToast('✅ تم الحذف بنجاح');
+                    self.loadTabData(tabName);
+                }).catch(function(err) {
+                    console.error('خطأ في الحذف:', err);
+                    self.showToast('❌ فشل الحذف: ' + err.message);
+                });
+            },
+
+            // ============================================
+            // الجزء 17د: مرجع المهمة
+            // ============================================
+
+            // فتح نافذة مرجع المهمة
+            openTaskModal: function() {
+                this.dom.taskModal.classList.add('active');
+            },
+
+            // إغلاق نافذة مرجع المهمة
+            closeTaskModal: function() {
+                this.dom.taskModal.classList.remove('active');
+            },
+
+            // إضافة زبون (عمود L)
+            addCustomer: function() {
+                var tabName = this.state.currentTab;
+                if (!tabName) {
+                    this.showToast('يرجى اختيار صفحة أولاً');
+                    return;
+                }
+
+                this.closeTaskModal();
+                var name = prompt('أدخل اسم الزبون:');
+                if (!name || name.trim() === '') {
+                    this.showToast('تم الإلغاء');
+                    return;
+                }
+
+                this.showToast('جاري إضافة الزبون...');
+                var self = this;
+
+                appendToColumn(tabName, 'L', name.trim()).then(function() {
+                    self.showToast('✅ تم إضافة الزبون بنجاح');
+                    self.loadTabData(tabName);
+                }).catch(function(err) {
+                    console.error('خطأ في إضافة الزبون:', err);
+                    self.showToast('❌ فشل إضافة الزبون: ' + err.message);
+                });
+            },
+
+            // إضافة عامل (عمود J)
+            addWorker: function() {
+                var tabName = this.state.currentTab;
+                if (!tabName) {
+                    this.showToast('يرجى اختيار صفحة أولاً');
+                    return;
+                }
+
+                this.closeTaskModal();
+                var name = prompt('أدخل اسم العامل:');
+                if (!name || name.trim() === '') {
+                    this.showToast('تم الإلغاء');
+                    return;
+                }
+
+                this.showToast('جاري إضافة العامل...');
+                var self = this;
+
+                appendToColumn(tabName, 'J', name.trim()).then(function() {
+                    self.showToast('✅ تم إضافة العامل بنجاح');
+                    self.loadTabData(tabName);
+                }).catch(function(err) {
+                    console.error('خطأ في إضافة العامل:', err);
+                    self.showToast('❌ فشل إضافة العامل: ' + err.message);
                 });
             },
 
