@@ -750,6 +750,33 @@
         .fab-task:hover { transform:scale(1.1); box-shadow:0 4px 30px rgba(33,150,243,.4); background:#2196F3; color:var(--black); }
 
         /* ==========================================
+           الجزء 8و: زر مستودع اسمنت
+           ========================================== */
+        .fab-cement {
+            position: fixed;
+            bottom: 170px;
+            left: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid #FF9800;
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            color: #FF9800;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(255,152,0,.2);
+        }
+        .fab-cement.active { display: flex; }
+        .fab-cement:hover { transform:scale(1.1); box-shadow:0 4px 30px rgba(255,152,0,.4); background:#FF9800; color:var(--black); }
+
+        /* ==========================================
            الجزء 8هـ: نافذة مرجع المهمة
            ========================================== */
         .task-options { display:flex; flex-direction:column; gap:1rem; }
@@ -1026,6 +1053,9 @@
     <!-- زر مرجع المهمة -->
     <button class="fab-task" id="fab-task-btn" title="مرجع المهمة">📋</button>
 
+    <!-- زر مستودع اسمنت -->
+    <button class="fab-cement" id="fab-cement-btn" title="تسجيل استهلاك اسمنت">🏗️</button>
+
     <!-- نافذة مرجع المهمة -->
     <div class="modal-overlay" id="task-modal">
         <div class="modal-glass">
@@ -1049,6 +1079,34 @@
                     </span>
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- نافذة مستودع اسمنت -->
+    <div class="modal-overlay" id="cement-modal">
+        <div class="modal-glass">
+            <div class="modal-header">
+                <h2>🏗️ تسجيل استهلاك اسمنت</h2>
+                <button type="button" class="close-modal" id="close-cement-btn">✕</button>
+            </div>
+            <div class="form-group">
+                <label for="cement-day">اليوم</label>
+                <select id="cement-day">
+                    <option value="">-- اختر اليوم --</option>
+                    <option value="السبت">السبت</option>
+                    <option value="الأحد">الأحد</option>
+                    <option value="الاثنين">الاثنين</option>
+                    <option value="الثلاثاء">الثلاثاء</option>
+                    <option value="الأربعاء">الأربعاء</option>
+                    <option value="الخميس">الخميس</option>
+                    <option value="الجمعة">الجمعة</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="cement-qty">الكمية المستهلكة</label>
+                <input type="number" id="cement-qty" placeholder="أدخل الكمية" min="0" step="any">
+            </div>
+            <button type="button" class="submit-btn" id="cement-submit-btn">حفظ</button>
         </div>
     </div>
 
@@ -1716,7 +1774,13 @@
                     deleteConfirmModal: document.getElementById('delete-confirm-modal'),
                     closeDeleteConfirmBtn: document.getElementById('close-delete-confirm-btn'),
                     deleteCancelBtn: document.getElementById('delete-cancel-btn'),
-                    deleteConfirmBtn: document.getElementById('delete-confirm-btn')
+                    deleteConfirmBtn: document.getElementById('delete-confirm-btn'),
+                    fabCement: document.getElementById('fab-cement-btn'),
+                    cementModal: document.getElementById('cement-modal'),
+                    closeCementBtn: document.getElementById('close-cement-btn'),
+                    cementDay: document.getElementById('cement-day'),
+                    cementQty: document.getElementById('cement-qty'),
+                    cementSubmitBtn: document.getElementById('cement-submit-btn')
                 };
             },
 
@@ -1839,6 +1903,28 @@
                     }
                 });
 
+                // زر مستودع اسمنت
+                this.dom.fabCement.addEventListener('click', function() {
+                    App.openCementModal();
+                });
+
+                // إغلاق نافذة مستودع اسمنت
+                this.dom.closeCementBtn.addEventListener('click', function() {
+                    App.closeCementModal();
+                });
+
+                // إغلاق نافذة مستودع اسمنت بالنقر خارجها
+                this.dom.cementModal.addEventListener('click', function(e) {
+                    if (e.target === App.dom.cementModal) {
+                        App.closeCementModal();
+                    }
+                });
+
+                // حفظ استهلاك الاسمنت
+                this.dom.cementSubmitBtn.addEventListener('click', function() {
+                    App.saveCementConsumption();
+                });
+
                 // إغلاق النوافذ بـ Escape
                 document.addEventListener('keydown', function(e) {
                     if (e.key === 'Escape') {
@@ -1875,6 +1961,7 @@
                 this.dom.tabsSection.classList.remove('hidden');
                 this.dom.fab.classList.remove('active');
                 this.dom.fabTask.classList.remove('active');
+                this.dom.fabCement.classList.remove('active');
                 this.state.currentTab = null;
             },
 
@@ -1885,6 +1972,7 @@
                 this.dom.contentSection.classList.add('hidden');
                 this.dom.fab.classList.remove('active');
                 this.dom.fabTask.classList.remove('active');
+                this.dom.fabCement.classList.remove('active');
                 this.state.currentTab = null;
             },
 
@@ -1908,6 +1996,13 @@
                     this.dom.fabTask.classList.add('active');
                 } else {
                     this.dom.fabTask.classList.remove('active');
+                }
+
+                // إظهار زر مستودع اسمنت فقط في صفحة "مستودع اسمنت"
+                if (tabName && tabName.indexOf('اسمنت') !== -1) {
+                    this.dom.fabCement.classList.add('active');
+                } else {
+                    this.dom.fabCement.classList.remove('active');
                 }
 
                 this.loadTabData(tabName);
@@ -2541,6 +2636,130 @@
                 }).catch(function(err) {
                     console.error('خطأ في إضافة العامل:', err);
                     self.showToast('❌ فشل إضافة العامل: ' + err.message);
+                });
+            },
+
+            // ============================================
+            // الجزء 17هـ: مستودع اسمنت
+            // ============================================
+
+            // فتح نافذة مستودع اسمنت
+            openCementModal: function() {
+                var tabName = this.state.currentTab;
+                if (!tabName || tabName.indexOf('اسمنت') === -1) {
+                    this.showToast('هذا الزر مخصص لصفحة مستودع اسمنت فقط');
+                    return;
+                }
+                this.dom.cementDay.value = '';
+                this.dom.cementQty.value = '';
+                this.dom.cementModal.classList.add('active');
+                var self = this;
+                setTimeout(function() {
+                    self.dom.cementDay.focus();
+                }, 300);
+            },
+
+            // إغلاق نافذة مستودع اسمنت
+            closeCementModal: function() {
+                this.dom.cementModal.classList.remove('active');
+            },
+
+            // حفظ استهلاك الاسمنت
+            saveCementConsumption: function() {
+                var tabName = this.state.currentTab;
+                var day = this.dom.cementDay.value;
+                var qty = this.dom.cementQty.value.trim();
+
+                if (!day) {
+                    this.showToast('الرجاء اختيار اليوم');
+                    return;
+                }
+                if (!qty || isNaN(parseFloat(qty))) {
+                    this.showToast('الرجاء إدخال كمية صحيحة');
+                    return;
+                }
+
+                var self = this;
+                this.closeCementModal();
+                this.showToast('جاري حفظ البيانات...');
+
+                // البحث عن العمود المناسب بمقارنة اسم اليوم مع الأعمدة في الجدول
+                var headers = this.state.currentHeaders || [];
+                var tabFormat = this.state.tabFormat && this.state.tabFormat[tabName] || {};
+                var firstColIndex = tabFormat.firstColIndex || 0;
+
+                // تطبيع النص: إزالة "ال" التعريف والتاء المربوطة
+                function normalize(s) {
+                    return String(s || '').trim()
+                        .replace(/^ال/, '')
+                        .replace(/ة/g, 'ه')
+                        .replace(/ى/g, 'ي');
+                }
+
+                var normalizedDay = normalize(day);
+
+                // البحث عن العمود الذي يطابق اسم اليوم
+                var colIndex = -1;
+                for (var i = 0; i < headers.length; i++) {
+                    var headerName = normalize(headers[i]);
+                    if (headerName === normalizedDay) {
+                        colIndex = firstColIndex + i;
+                        break;
+                    }
+                }
+
+                // إذا لم يتم العثور على العمود، استخدم الحساب الافتراضي
+                if (colIndex === -1) {
+                    var dayOffsets = {
+                        'السبت': 0,
+                        'الأحد': 1,
+                        'الاثنين': 2,
+                        'الثلاثاء': 3,
+                        'الأربعاء': 4,
+                        'الخميس': 5,
+                        'الجمعة': 6
+                    };
+                    var dayOffset = dayOffsets[day];
+                    if (dayOffset === undefined) {
+                        this.showToast('❌ خطأ في تحديد اليوم');
+                        return;
+                    }
+                    colIndex = firstColIndex + dayOffset;
+                }
+
+                var col = String.fromCharCode(65 + colIndex); // 0=A, 1=B, ...
+
+                // الصف 4 مباشرة في Google Sheets
+                var sheetRow = 4;
+
+                // كتابة القيمة في الخلية المحددة
+                var token = null;
+                getAccessToken().then(function(t) {
+                    token = t;
+                    return fetch(
+                        'https://sheets.googleapis.com/v4/spreadsheets/' +
+                        CONFIG.spreadsheedId + '/values/' + encodeURIComponent(tabName) + '!' + col + sheetRow + '?valueInputOption=USER_ENTERED', {
+                            method: 'PUT',
+                            headers: {
+                                'Authorization': 'Bearer ' + token,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ values: [[parseFloat(qty)]] })
+                        }
+                    );
+                }).then(function(res) {
+                    if (!res.ok) {
+                        return res.text().then(function(text) {
+                            throw new Error(text);
+                        });
+                    }
+                    return res.json();
+                }).then(function() {
+                    self.showToast('✅ تم حفظ استهلاك الاسمنت بنجاح');
+                    self.loadTabData(tabName);
+                }).catch(function(err) {
+                    console.error('خطأ في حفظ استهلاك الاسمنت:', err);
+                    self.showToast('❌ فشل الحفظ: ' + err.message);
                 });
             },
 
