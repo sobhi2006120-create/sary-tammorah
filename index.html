@@ -203,7 +203,7 @@
             font-weight: 600;
         }
 
-        .back-btn, .home-btn {
+        .back-btn, .home-btn, .share-btn {
             background: none;
             border: 1px solid var(--glass-border);
             color: var(--gold);
@@ -215,9 +215,54 @@
             font-family: inherit;
         }
 
-        .back-btn:hover, .home-btn:hover {
+        .back-btn:hover, .home-btn:hover, .share-btn:hover {
             background: rgba(212, 175, 55, 0.1);
             box-shadow: 0 0 15px var(--gold-glow);
+        }
+
+        .share-btn {
+            display: none;
+        }
+
+        .share-btn.show {
+            display: inline-block;
+        }
+
+        .share-row-btn {
+            border: 1px solid var(--glass-border);
+            background: var(--glass-bg);
+            color: var(--gold);
+            border-radius: 8px;
+            padding: 5px 10px;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            transition: all .2s;
+        }
+
+        .share-row-btn:hover {
+            border-color: var(--gold);
+            background: rgba(212, 175, 55, 0.15);
+            box-shadow: 0 0 10px var(--gold-glow);
+        }
+
+        .share-col { width: 60px; text-align: center; white-space: nowrap; }
+
+        .share-options { display: flex; flex-direction: column; gap: 0.8rem; }
+
+        .share-last-receipt {
+            width: 100%;
+            padding: 0.9rem 1rem;
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--gold);
+            font-size: 1rem;
+            font-weight: 700;
+            min-height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
         }
 
         /* ==========================================
@@ -989,6 +1034,28 @@
         /* ==========================================
            الجزء 10: التجاوب مع الشاشات
            ========================================== */
+        /* مجموعات البلوك الأربع */
+        .block-groups { display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem; }
+        .block-group {
+            display: grid;
+            grid-template-columns: 1fr 100px 1fr;
+            gap: 0.8rem;
+            padding: 1rem;
+            background: rgba(36, 36, 36, 0.8);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+        }
+        .block-group .form-group { margin-bottom: 0; }
+        .block-group .form-group label { font-size: 0.8rem; margin-bottom: 0.3rem; }
+        .block-group .form-group input { padding: 0.6rem 0.8rem; font-size: 0.9rem; }
+        .block-group-label {
+            grid-column: 1 / -1;
+            color: var(--gold);
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 0.2rem;
+        }
+
         @media (max-width: 600px) {
             .logo-img { width: 200px; }
             .down-indicator img { width: 200px; }
@@ -998,6 +1065,7 @@
             .table-glass td { padding: 0.6rem 0.8rem; }
             .app-header { padding: 0.8rem 1rem; }
             #content-section { padding: 1rem; }
+            .block-group { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -1025,6 +1093,7 @@
         <header class="app-header">
             <button class="back-btn" id="back-to-tabs-btn">→ الصفحات</button>
             <span class="header-title" id="header-title">صاري 5.0</span>
+            <button class="share-btn" id="share-btn">📤 مشاركة</button>
             <button class="home-btn" id="home-btn">الرئيسية</button>
         </header>
 
@@ -1136,6 +1205,27 @@
                 <div id="form-fields"></div>
                 <button type="submit" class="submit-btn">حفظ</button>
             </form>
+        </div>
+    </div>
+
+    <!-- نافذة المشاركة -->
+    <div class="modal-overlay" id="share-modal">
+        <div class="modal-glass">
+            <div class="modal-header">
+                <h2>📤 مشاركة الايصالات</h2>
+                <button type="button" class="close-modal" id="close-share-btn">✕</button>
+            </div>
+            <div class="share-options">
+                <div class="form-group" style="margin-bottom:1rem;">
+                    <label for="share-receipt-no">تحديد رقم الايصال</label>
+                    <input type="text" id="share-receipt-no" placeholder="أدخل رقم الايصال" autocomplete="off">
+                </div>
+                <div class="form-group" style="margin-bottom:1rem;">
+                    <label for="share-last-receipt">آخر ايصال مقطوع</label>
+                    <div class="share-last-receipt" id="share-last-receipt">-</div>
+                </div>
+                <button type="button" class="submit-btn" id="share-by-number-btn">نسخ الإيصالات وفتح واتساب</button>
+            </div>
         </div>
     </div>
 
@@ -1731,7 +1821,45 @@
                 currentRows: [],         // صفوف البيانات المعروضة حالياً
                 pendingPrintRow: null,   // رقم الصف المحدد للطباعة
                 editingRowIndex: null,   // رقم الصف قيد التعديل
-                deletingRowIndex: null    // رقم الصف المراد حذفه
+                deletingRowIndex: null,   // رقم الصف المراد حذفه
+                sharedReceipts: {}       // بيانات الايصالات المضافة مجمّعة {tabName: [{receiptNo, customer, driver, blocks:[], day, date}]}
+            },
+
+            loadSharedReceipts: function(tabName) {
+                try {
+                    var val = localStorage.getItem('shared_receipts_' + tabName);
+                    if (val) {
+                        this.state.sharedReceipts[tabName] = JSON.parse(val);
+                    }
+                } catch (e) {}
+            },
+
+            saveSharedReceipts: function(tabName) {
+                try {
+                    var data = this.state.sharedReceipts[tabName] || [];
+                    localStorage.setItem('shared_receipts_' + tabName, JSON.stringify(data));
+                } catch (e) {}
+            },
+
+            addSharedReceipts: function(tabName, receipts) {
+                if (!this.state.sharedReceipts[tabName]) {
+                    this.state.sharedReceipts[tabName] = [];
+                }
+                var existing = this.state.sharedReceipts[tabName];
+                receipts.forEach(function(r) {
+                    var found = false;
+                    for (var i = 0; i < existing.length; i++) {
+                        if (existing[i].receiptNo === r.receiptNo) {
+                            existing[i].blocks = existing[i].blocks.concat(r.blocks);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        existing.push(r);
+                    }
+                });
+                this.saveSharedReceipts(tabName);
             },
 
             // مراجع عناصر DOM
@@ -1746,6 +1874,12 @@
                     headerTitle: document.getElementById('header-title'),
                     backBtn: document.getElementById('back-to-tabs-btn'),
                     homeBtn: document.getElementById('home-btn'),
+                    shareBtn: document.getElementById('share-btn'),
+                    shareModal: document.getElementById('share-modal'),
+                    closeShareBtn: document.getElementById('close-share-btn'),
+                    shareReceiptNo: document.getElementById('share-receipt-no'),
+                    shareLastReceipt: document.getElementById('share-last-receipt'),
+                    shareByNumberBtn: document.getElementById('share-by-number-btn'),
                     tabsSection: document.getElementById('tabs-section'),
                     tabsGrid: document.getElementById('tabs-grid'),
                     contentSection: document.getElementById('content-section'),
@@ -1858,6 +1992,26 @@
                     }
                 });
 
+                // زر المشاركة
+                this.dom.shareBtn.addEventListener('click', function() {
+                    App.openShareModal();
+                });
+
+                // إغلاق نافذة المشاركة
+                this.dom.closeShareBtn.addEventListener('click', function() {
+                    App.closeShareModal();
+                });
+                this.dom.shareModal.addEventListener('click', function(e) {
+                    if (e.target === App.dom.shareModal) {
+                        App.closeShareModal();
+                    }
+                });
+
+                // مشاركة نطاق الايصالات من الرقم المحدد حتى آخر ايصال
+                this.dom.shareByNumberBtn.addEventListener('click', function() {
+                    App.shareByReceiptNo();
+                });
+
                 // زر مرجع المهمة
                 this.dom.fabTask.addEventListener('click', function() {
                     App.openTaskModal();
@@ -1930,6 +2084,8 @@
                     if (e.key === 'Escape') {
                         if (App.state.isEntryOpen) {
                             App.closeEntryForm();
+                        } else if (App.dom.shareModal.classList.contains('active')) {
+                            App.closeShareModal();
                         } else if (App.dom.printConfirmModal.classList.contains('active')) {
                             App.closePrintConfirm();
                         }
@@ -1963,6 +2119,7 @@
                 this.dom.fabTask.classList.remove('active');
                 this.dom.fabCement.classList.remove('active');
                 this.state.currentTab = null;
+                this.updateShareButtonVisibility();
             },
 
             // إظهار أزرار التبويبات
@@ -1974,6 +2131,7 @@
                 this.dom.fabTask.classList.remove('active');
                 this.dom.fabCement.classList.remove('active');
                 this.state.currentTab = null;
+                this.updateShareButtonVisibility();
             },
 
             // التوجه لتبويب معين
@@ -2005,6 +2163,8 @@
                     this.dom.fabCement.classList.remove('active');
                 }
 
+                this.updateShareButtonVisibility();
+                this.loadSharedReceipts(tabName);
                 this.loadTabData(tabName);
             },
 
@@ -2183,6 +2343,7 @@
                 });
                 if(printable) html += '<th class="print-col">طباعة</th>';
                 if(writable) html += '<th class="action-col">إجراءات</th>';
+                 if(tabName.indexOf('تصريف') !== -1) html += '<th class="share-col">مشاركة</th>';
                 html += '</tr></thead><tbody>';
 
                 if (rows.length === 0) {
@@ -2228,6 +2389,11 @@
                                 '<button class="delete-row-btn" data-ri="' + ri + '" title="حذف">🗑️</button>' +
                                 '</td>';
                         }
+                        if (tabName.indexOf('تصريف') !== -1) {
+                            html += '<td class="share-col">' +
+                                '<button class="share-row-btn" data-ri="' + ri + '" title="مشاركة">📤</button>' +
+                                '</td>';
+                        }
                         html += '</tr>';
                     });
                 }
@@ -2269,6 +2435,19 @@
                         });
                     });
                 }
+
+                // ربط حدث النقر على أزرار المشاركة
+                if (tabName.indexOf('تصريف') !== -1) {
+                    this.dom.tableContainer.querySelectorAll('.share-row-btn').forEach(function(btn) {
+                        btn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            var ri = parseInt(this.getAttribute('data-ri'), 10);
+                            if (!isNaN(ri)) {
+                                App.shareSingleRow(ri);
+                            }
+                        });
+                    });
+                }
             },
 
             // ============================================
@@ -2279,7 +2458,6 @@
             openEntryForm: async function() {
                 var tabName = this.state.currentTab;
 
-                // حماية: لا تسمح بالكتابة في الأوراق غير القابلة للكتابة
                 if (!tabName || !isWritable(tabName)) {
                     this.showToast('✋ الكتابة متاحة فقط للأوراق المحددة');
                     return;
@@ -2300,7 +2478,6 @@
                     '<div class="empty-state"><div class="empty-icon">⏳</div><p>جاري تحميل الحقول...</p></div>';
                 this.dom.entryModal.classList.add('active');
 
-                // جلب القوائم المنسدلة لكل عمود (إن وُجدت)
                 var dropdowns = [];
                 try {
                     dropdowns = await getColumnDropdowns(this.state.currentTab);
@@ -2308,38 +2485,128 @@
                     console.error('خطأ في جلب القوائم المنسدلة:', e);
                 }
 
-                // توليد الحقول من عناوين الأعمدة (تجاهل الأعمدة الفارغة في بداية الرأس)
                 var emptyOffset = tabFormat.emptyOffset || 0;
                 var visibleHeaders = headers.slice(emptyOffset);
                 var fieldOptions = [];
-                this.dom.formFields.innerHTML = visibleHeaders.map(function(h, i) {
-                    var colIndex = i + emptyOffset;
-                    var dd = dropdowns[colIndex];
-                    if (dd && dd.options && dd.options.length) {
-                        fieldOptions[colIndex] = dd.options;
-                        return '<div class="form-group combobox">' +
+
+                var isDischarge = tabName.indexOf('تصريف') !== -1;
+
+                if (isDischarge) {
+                    var blockIdx = -1, qtyIdx = -1, opIdx = -1;
+                    var sharedFields = [];
+                    visibleHeaders.forEach(function(h, i) {
+                        var colIndex = i + emptyOffset;
+                        var name = String(h || '').trim();
+                        if (name === 'نوع البلوك') { blockIdx = colIndex; return; }
+                        if (name === 'العدد') { qtyIdx = colIndex; return; }
+                        if (name === 'نوع العملية') { opIdx = colIndex; return; }
+                        sharedFields.push({ colIndex: colIndex, name: name });
+                    });
+
+                    var html = '';
+                    sharedFields.forEach(function(f) {
+                        var dd = dropdowns[f.colIndex];
+                        if (dd && dd.options && dd.options.length) {
+                            fieldOptions[f.colIndex] = dd.options;
+                            html += '<div class="form-group combobox">' +
+                                '<label for="field-' + f.colIndex + '">' + f.name + '</label>' +
+                                '<input type="text" id="field-' + f.colIndex + '" name="field-' + f.colIndex + '" ' +
+                                'class="combobox-input" autocomplete="off" ' +
+                                'placeholder="ابحث عن ' + f.name + '" required>' +
+                                '<ul class="combobox-list" id="list-' + f.colIndex + '"></ul>' +
+                                '<span class="field-error-msg">⚠️ قيمة غير موجودة في القائمة</span>' +
+                                '</div>';
+                        } else {
+                            html += '<div class="form-group">' +
+                                '<label for="field-' + f.colIndex + '">' + f.name + '</label>' +
+                                '<input type="text" id="field-' + f.colIndex + '" name="field-' + f.colIndex + '" ' +
+                                'placeholder="أدخل ' + f.name + '" required>' +
+                                '</div>';
+                        }
+                    });
+
+                    html += '<div class="block-groups">';
+                    for (var g = 0; g < 4; g++) {
+                        html += '<div class="block-group">' +
+                            '<div class="block-group-label">بلوك ' + (g + 1) + '</div>';
+
+                        var ddBlock = dropdowns[blockIdx];
+                        if (ddBlock && ddBlock.options && ddBlock.options.length) {
+                            fieldOptions['block_' + g] = ddBlock.options;
+                            html += '<div class="form-group combobox">' +
+                                '<label for="block-' + g + '">نوع البلوك</label>' +
+                                '<input type="text" id="block-' + g + '" class="combobox-input" autocomplete="off" ' +
+                                'placeholder="ابحث عن نوع البلوك">' +
+                                '<ul class="combobox-list" id="list-block-' + g + '"></ul>' +
+                                '<span class="field-error-msg">⚠️ قيمة غير موجودة في القائمة</span>' +
+                                '</div>';
+                        } else {
+                            html += '<div class="form-group">' +
+                                '<label for="block-' + g + '">نوع البلوك</label>' +
+                                '<input type="text" id="block-' + g + '" placeholder="أدخل نوع البلوك">' +
+                                '</div>';
+                        }
+
+                        html += '<div class="form-group">' +
+                            '<label for="qty-' + g + '">العدد</label>' +
+                            '<input type="number" id="qty-' + g + '" placeholder="العدد" min="0" step="any">' +
+                            '</div>';
+
+                        var ddOp = dropdowns[opIdx];
+                        if (ddOp && ddOp.options && ddOp.options.length) {
+                            fieldOptions['op_' + g] = ddOp.options;
+                            html += '<div class="form-group combobox">' +
+                                '<label for="op-' + g + '">نوع العملية</label>' +
+                                '<input type="text" id="op-' + g + '" class="combobox-input" autocomplete="off" ' +
+                                'placeholder="ابحث عن نوع العملية">' +
+                                '<ul class="combobox-list" id="list-op-' + g + '"></ul>' +
+                                '<span class="field-error-msg">⚠️ قيمة غير موجودة في القائمة</span>' +
+                                '</div>';
+                        } else {
+                            html += '<div class="form-group">' +
+                                '<label for="op-' + g + '">نوع العملية</label>' +
+                                '<input type="text" id="op-' + g + '" placeholder="أدخل نوع العملية">' +
+                                '</div>';
+                        }
+
+                        html += '</div>';
+                    }
+                    html += '</div>';
+
+                    this.dom.formFields.innerHTML = html;
+                    this.state._lastFieldOptions = fieldOptions;
+                    this.state._dischargeMode = true;
+                    this.state._dischargeBlockIdx = blockIdx;
+                    this.state._dischargeQtyIdx = qtyIdx;
+                    this.state._dischargeOpIdx = opIdx;
+                    this.initComboboxes(fieldOptions);
+                } else {
+                    this.dom.formFields.innerHTML = visibleHeaders.map(function(h, i) {
+                        var colIndex = i + emptyOffset;
+                        var dd = dropdowns[colIndex];
+                        if (dd && dd.options && dd.options.length) {
+                            fieldOptions[colIndex] = dd.options;
+                            return '<div class="form-group combobox">' +
+                                '<label for="field-' + colIndex + '">' + h + '</label>' +
+                                '<input type="text" id="field-' + colIndex + '" name="field-' + colIndex + '" ' +
+                                'class="combobox-input" autocomplete="off" ' +
+                                'placeholder="ابحث عن ' + h + '" required>' +
+                                '<ul class="combobox-list" id="list-' + colIndex + '"></ul>' +
+                                '<span class="field-error-msg">⚠️ قيمة غير موجودة في القائمة</span>' +
+                                '</div>';
+                        }
+                        return '<div class="form-group">' +
                             '<label for="field-' + colIndex + '">' + h + '</label>' +
                             '<input type="text" id="field-' + colIndex + '" name="field-' + colIndex + '" ' +
-                            'class="combobox-input" autocomplete="off" ' +
-                            'placeholder="ابحث عن ' + h + '..." required>' +
-                            '<ul class="combobox-list" id="list-' + colIndex + '"></ul>' +
-                            '<span class="field-error-msg">⚠️ قيمة غير موجودة في القائمة</span>' +
+                            'placeholder="أدخل ' + h + '" required>' +
                             '</div>';
-                    }
-                    return '<div class="form-group">' +
-                        '<label for="field-' + colIndex + '">' + h + '</label>' +
-                        '<input type="text" id="field-' + colIndex + '" name="field-' + colIndex + '" ' +
-                        'placeholder="أدخل ' + h + '" required>' +
-                        '</div>';
-                }).join('');
+                    }).join('');
 
-                // حفظ للتحقق لاحقاً في الصفحات المقيّدة
-                this.state._lastFieldOptions = fieldOptions;
+                    this.state._lastFieldOptions = fieldOptions;
+                    this.state._dischargeMode = false;
+                    this.initComboboxes(fieldOptions);
+                }
 
-                // تهيئة القوائم القابلة للبحث
-                this.initComboboxes(fieldOptions);
-
-                // التركيز على أول حقل
                 setTimeout(function() {
                     var firstInput = App.dom.formFields.querySelector('input');
                     if (firstInput) firstInput.focus();
@@ -2348,10 +2615,23 @@
 
             // تهيئة جميع حقول القوائم القابلة للبحث
             initComboboxes: function(fieldOptions) {
-                fieldOptions.forEach(function(options, i) {
+                Object.keys(fieldOptions).forEach(function(key) {
+                    var options = fieldOptions[key];
                     if (!options) return;
-                    var input = document.getElementById('field-' + i);
-                    var list = document.getElementById('list-' + i);
+                    var input, list;
+                    if (typeof key === 'number' || /^\d+$/.test(key)) {
+                        input = document.getElementById('field-' + key);
+                        list = document.getElementById('list-' + key);
+                    } else {
+                        var parts = key.split('_');
+                        if (parts[0] === 'block') {
+                            input = document.getElementById('block-' + parts[1]);
+                            list = document.getElementById('list-block-' + parts[1]);
+                        } else if (parts[0] === 'op') {
+                            input = document.getElementById('op-' + parts[1]);
+                            list = document.getElementById('list-op-' + parts[1]);
+                        }
+                    }
                     if (input && list) {
                         initCombobox(input, list, options);
                     }
@@ -2407,6 +2687,14 @@
 
             // معالجة إرسال النموذج
             handleEntrySubmit: function() {
+                var tabName = this.state.currentTab;
+                var self = this;
+
+                if (this.state._dischargeMode) {
+                    this.handleDischargeSubmit();
+                    return;
+                }
+
                 var inputs = this.dom.formFields.querySelectorAll('input, select');
                 var values = [];
                 var isValid = true;
@@ -2417,7 +2705,6 @@
                 inputs.forEach(function(input) {
                     var val = input.value.trim();
                     if (!val) isValid = false;
-                    // تحقق: الحقول المرتبطة بقائمة يجب أن تكون قيمتها مطابقة تماماً لأحد خياراتها
                     var m = input.id.match(/field-(\d+)/);
                     var cIdx = m ? parseInt(m[1], 10) : -1;
                     var opts = (cIdx >= 0) ? cachedOpts[cIdx] : null;
@@ -2438,7 +2725,6 @@
                     values.push(val);
                 });
 
-                // لا يتم الإرسال إذا وُجدت شارة خطأ في أي خلية
                 var errorGroups = this.dom.formFields.querySelectorAll('.field-error');
                 if (errorGroups.length) {
                     this.showToast('⚠️ صحح الحقول المشار إليها — قيمة غير موجودة في القائمة');
@@ -2450,11 +2736,7 @@
                     return;
                 }
 
-                var tabName = this.state.currentTab;
-                var self = this;
                 var tabFormat = this.state.tabFormat && this.state.tabFormat[tabName] || {};
-
-                // إضافة قيم فارغة للأعمدة الأولى التي بلا رأس (للمحاذاة الصحيحة)
                 var padCount = tabFormat.firstColIndex || 0;
                 for (var p = 0; p < padCount; p++) {
                     values.unshift('');
@@ -2465,9 +2747,179 @@
                 appendRow(tabName, values).then(function() {
                     self.showToast('✅ تمت إضافة البيانات بنجاح');
                     self.closeEntryForm();
-                    // إعادة تحميل البيانات الحالية
                     self.loadTabData(tabName);
-                    // تحديث الأوراق التي تحتوي صيغًا في الخلفية
+                    self.refreshFormulaSheets();
+                }).catch(function(err) {
+                    console.error('خطأ في الحفظ:', err);
+                    self.showToast('❌ فشل الحفظ: ' + err.message);
+                });
+            },
+
+            handleDischargeSubmit: function() {
+                var tabName = this.state.currentTab;
+                var self = this;
+                var blockIdx = this.state._dischargeBlockIdx;
+                var qtyIdx = this.state._dischargeQtyIdx;
+                var opIdx = this.state._dischargeOpIdx;
+                var cachedOpts = this.state._lastFieldOptions || [];
+
+                var inputs = this.dom.formFields.querySelectorAll('input[id^="field-"]');
+                var sharedValues = {};
+                var isValid = true;
+
+                inputs.forEach(function(input) {
+                    var val = input.value.trim();
+                    var m = input.id.match(/field-(\d+)/);
+                    var cIdx = m ? parseInt(m[1], 10) : -1;
+                    if (cIdx < 0) return;
+
+                    if (!val) {
+                        isValid = false;
+                        return;
+                    }
+
+                    var opts = cachedOpts[cIdx];
+                    if (opts && Array.isArray(opts) && opts.length) {
+                        var exact = false;
+                        for (var k = 0; k < opts.length; k++) {
+                            if (String(opts[k]).trim() === val) { exact = true; break; }
+                        }
+                        if (!exact) {
+                            isValid = false;
+                            input.classList.add('field-error');
+                            var grp = input.closest('.form-group');
+                            var msg = grp ? grp.querySelector('.field-error-msg') : null;
+                            if (msg) msg.classList.add('show');
+                        }
+                    }
+                    sharedValues[cIdx] = val;
+                });
+
+                var errorGroups = this.dom.formFields.querySelectorAll('.field-error');
+                if (errorGroups.length) {
+                    this.showToast('⚠️ صحح الحقول المشار إليها — قيمة غير موجودة في القائمة');
+                    return;
+                }
+
+                if (!isValid) {
+                    this.showToast('الرجاء ملء جميع الحقول');
+                    return;
+                }
+
+                var groups = [];
+                for (var g = 0; g < 4; g++) {
+                    var blockInput = document.getElementById('block-' + g);
+                    var qtyInput = document.getElementById('qty-' + g);
+                    var opInput = document.getElementById('op-' + g);
+
+                    var blockVal = blockInput ? blockInput.value.trim() : '';
+                    var qtyVal = qtyInput ? qtyInput.value.trim() : '';
+                    var opVal = opInput ? opInput.value.trim() : '';
+
+                    if (!blockVal && !qtyVal && !opVal) continue;
+
+                    if (!blockVal || !qtyVal || !opVal) {
+                        this.showToast('يرجى ملء جميع الحقول في بلوك ' + (g + 1) + ' أو تركها فارغة');
+                        return;
+                    }
+
+                    var blockOpts = cachedOpts['block_' + g];
+                    if (blockOpts && Array.isArray(blockOpts) && blockOpts.length) {
+                        var exactB = false;
+                        for (var k = 0; k < blockOpts.length; k++) {
+                            if (String(blockOpts[k]).trim() === blockVal) { exactB = true; break; }
+                        }
+                        if (!exactB) {
+                            blockInput.classList.add('field-error');
+                            var grpB = blockInput.closest('.form-group');
+                            var msgB = grpB ? grpB.querySelector('.field-error-msg') : null;
+                            if (msgB) msgB.classList.add('show');
+                            this.showToast('⚠️ قيمة نوع البلوك غير موجودة في القائمة');
+                            return;
+                        }
+                    }
+
+                    var opOpts = cachedOpts['op_' + g];
+                    if (opOpts && Array.isArray(opOpts) && opOpts.length) {
+                        var exactO = false;
+                        for (var k = 0; k < opOpts.length; k++) {
+                            if (String(opOpts[k]).trim() === opVal) { exactO = true; break; }
+                        }
+                        if (!exactO) {
+                            opInput.classList.add('field-error');
+                            var grpO = opInput.closest('.form-group');
+                            var msgO = grpO ? grpO.querySelector('.field-error-msg') : null;
+                            if (msgO) msgO.classList.add('show');
+                            this.showToast('⚠️ قيمة نوع العملية غير موجودة في القائمة');
+                            return;
+                        }
+                    }
+
+                    groups.push({ block: blockVal, qty: qtyVal, op: opVal });
+                }
+
+                if (groups.length === 0) {
+                    this.showToast('يرجى إدخال بلوك واحد على الأقل');
+                    return;
+                }
+
+                var headers = this.state.currentHeaders || [];
+                var receiptNo = '', customer = '', driver = '', day = '', dateVal = '';
+                headers.forEach(function(h, ci) {
+                    if (App.isReceiptHeader(h)) receiptNo = sharedValues[ci] || '';
+                    else if (App.isCustomerHeader(h)) customer = sharedValues[ci] || '';
+                    else if (App.isDriverHeader(h)) driver = sharedValues[ci] || '';
+                    else if (App.isDayHeader(h)) day = sharedValues[ci] || '';
+                    else if (App.isDateHeader(h)) dateVal = sharedValues[ci] || '';
+                });
+
+                if (receiptNo && receiptNo.trim() !== '') {
+                    App.addSharedReceipts(tabName, [{
+                        receiptNo: receiptNo,
+                        customer: customer,
+                        driver: driver,
+                        blocks: groups.map(function(g) { return { block: g.block, qty: g.qty, op: g.op }; }),
+                        day: day,
+                        date: dateVal
+                    }]);
+                }
+
+                var tabFormat = this.state.tabFormat && this.state.tabFormat[tabName] || {};
+                var padCount = tabFormat.firstColIndex || 0;
+                var maxCol = Math.max(blockIdx, qtyIdx, opIdx) + padCount;
+
+                var rows = groups.map(function(g) {
+                    var row = [];
+                    for (var c = 0; c <= maxCol; c++) {
+                        var actualCol = c + padCount;
+                        if (actualCol === blockIdx) {
+                            row.push(g.block);
+                        } else if (actualCol === qtyIdx) {
+                            row.push(g.qty);
+                        } else if (actualCol === opIdx) {
+                            row.push(g.op);
+                        } else if (sharedValues[actualCol] !== undefined) {
+                            row.push(sharedValues[actualCol]);
+                        } else {
+                            row.push('');
+                        }
+                    }
+                    return row;
+                });
+
+                this.showToast('جاري حفظ ' + groups.length + ' من البلوك...');
+
+                var chain = Promise.resolve();
+                rows.forEach(function(rowValues) {
+                    chain = chain.then(function() {
+                        return appendRow(tabName, rowValues);
+                    });
+                });
+
+                chain.then(function() {
+                    self.showToast('✅ تمت إضافة ' + groups.length + ' بلوك بنجاح');
+                    self.closeEntryForm();
+                    self.loadTabData(tabName);
                     self.refreshFormulaSheets();
                 }).catch(function(err) {
                     console.error('خطأ في الحفظ:', err);
@@ -2868,6 +3320,318 @@
                     '<div class="print-meta"><span>تاريخ الطباعة: ' + escapeHtml(dateStr) +
                     ' — ' + escapeHtml(timeStr) + '</span></div>' +
                     '<table><tbody>' + bodyRows + '</tbody></table>';
+            },
+
+            // ============================================
+            // الجزء 17ز: مشاركة البيانات
+            // ============================================
+
+            normalizeArabicKey: function(s) {
+                return String(s || '').trim()
+                    .replace(/[إأآا]/g, 'ا')
+                    .replace(/[ةه]/g, 'ه')
+                    .replace(/ى/g, 'ي')
+                    .replace(/\s+/g, '');
+            },
+
+            isReceiptHeader: function(name) {
+                var normalized = this.normalizeArabicKey(name);
+                return normalized.indexOf('ايصال') !== -1 ||
+                    normalized.indexOf('وصل') !== -1;
+            },
+
+            isCustomerHeader: function(name) {
+                return this.normalizeArabicKey(name).indexOf('زبون') !== -1;
+            },
+
+            isDriverHeader: function(name) {
+                return this.normalizeArabicKey(name).indexOf('سائق') !== -1;
+            },
+
+            isBlockHeader: function(name) {
+                return this.normalizeArabicKey(name).indexOf('بلوك') !== -1;
+            },
+
+            isQtyHeader: function(name) {
+                var normalized = this.normalizeArabicKey(name);
+                return normalized === 'العدد' ||
+                    normalized.indexOf('عدد') !== -1 ||
+                    normalized.indexOf('كمي') !== -1;
+            },
+
+            isOperationHeader: function(name) {
+                return this.normalizeArabicKey(name).indexOf('عملي') !== -1;
+            },
+
+            isDayHeader: function(name) {
+                return this.normalizeArabicKey(name).indexOf('يوم') !== -1;
+            },
+
+            isDateHeader: function(name) {
+                return this.normalizeArabicKey(name).indexOf('تاريخ') !== -1;
+            },
+
+            formatReceiptRow: function(row, headers) {
+                var receiptNo = '', customer = '', driver = '', block = '', qty = '', op = '', day = '', date = '';
+                headers.forEach(function(h, ci) {
+                    var name = App.normalizeArabicKey(h);
+                    var val = row[ci] || '';
+                    if (App.isReceiptHeader(name)) receiptNo = val;
+                    else if (App.isCustomerHeader(name)) customer = val;
+                    else if (App.isDriverHeader(name)) driver = val;
+                    else if (App.isBlockHeader(name)) block = val;
+                    else if (App.isQtyHeader(name)) qty = val;
+                    else if (App.isOperationHeader(name)) op = val;
+                    else if (App.isDayHeader(name)) day = val;
+                    else if (App.isDateHeader(name)) date = val;
+                });
+                return {
+                    receiptNo: receiptNo,
+                    customer: customer,
+                    driver: driver,
+                    blocks: [{ block: block, qty: qty, op: op }],
+                    day: day,
+                    date: date
+                };
+            },
+
+            formatShareMessage: function(receipts) {
+                var lines = [];
+                receipts.forEach(function(r, idx) {
+                    lines.push('رقم الايصال: ' + r.receiptNo);
+                    lines.push('اسم الزبون: ' + r.customer);
+                    lines.push('اسم السائق: ' + r.driver);
+                    r.blocks.forEach(function(b) {
+                        lines.push('نوع البلوك: ' + b.block);
+                        lines.push('عدد: ' + b.qty);
+                        lines.push('نوع العملية: ' + b.op);
+                    });
+                    lines.push('اليوم: ' + r.day);
+                    lines.push('التاريخ: ' + r.date);
+                    if (idx !== receipts.length - 1) {
+                        lines.push('');
+                    }
+                });
+                return lines.join('\n');
+            },
+
+            getLastSharedIndex: function(tabName) {
+                try {
+                    var val = localStorage.getItem('last_shared_' + tabName);
+                    return val ? parseInt(val, 10) : -1;
+                } catch (e) {
+                    return -1;
+                }
+            },
+
+            setLastSharedIndex: function(tabName, idx) {
+                try {
+                    localStorage.setItem('last_shared_' + tabName, String(idx));
+                } catch (e) {}
+            },
+
+            getLastSharedReceiptNo: function(tabName) {
+                try {
+                    var val = localStorage.getItem('last_shared_receipt_' + tabName);
+                    return val ? val : '';
+                } catch (e) {
+                    return '';
+                }
+            },
+
+            setLastSharedReceiptNo: function(tabName, receiptNo) {
+                try {
+                    localStorage.setItem('last_shared_receipt_' + tabName, String(receiptNo));
+                } catch (e) {}
+            },
+
+            groupRowsByReceipt: function(rows, headers) {
+                var map = {};
+                var order = [];
+                rows.forEach(function(row, ri) {
+                    var formatted = App.formatReceiptRow(row, headers);
+                    var receiptKey = String(formatted.receiptNo || '').trim();
+                    var hasBlockData = formatted.blocks.some(function(blockRow) {
+                        return String(blockRow.block || '').trim() !== '' ||
+                            String(blockRow.qty || '').trim() !== '' ||
+                            String(blockRow.op || '').trim() !== '';
+                    });
+
+                    if (!receiptKey) {
+                        if (!order.length || !hasBlockData) return;
+                        receiptKey = order[order.length - 1];
+                    }
+
+                    if (!map[receiptKey]) {
+                        map[receiptKey] = {
+                            receiptNo: receiptKey,
+                            customer: formatted.customer,
+                            driver: formatted.driver,
+                            blocks: [],
+                            day: formatted.day,
+                            date: formatted.date,
+                            firstIndex: ri
+                        };
+                        order.push(receiptKey);
+                    }
+                    if (!map[receiptKey].customer && formatted.customer) map[receiptKey].customer = formatted.customer;
+                    if (!map[receiptKey].driver && formatted.driver) map[receiptKey].driver = formatted.driver;
+                    if (!map[receiptKey].day && formatted.day) map[receiptKey].day = formatted.day;
+                    if (!map[receiptKey].date && formatted.date) map[receiptKey].date = formatted.date;
+                    map[receiptKey].blocks.push.apply(map[receiptKey].blocks, formatted.blocks);
+                });
+                return order.map(function(key) { return map[key]; });
+            },
+
+            openWhatsApp: function(text) {
+                var encoded = encodeURIComponent(text);
+                var url = 'https://wa.me/?text=' + encoded;
+                window.open(url, '_blank');
+            },
+
+            openShareModal: function() {
+                var tabName = this.state.currentTab;
+                if (!tabName || tabName.indexOf('تصريف') === -1) return;
+                var last = this.getLastReceiptNo();
+                if (this.dom.shareReceiptNo) {
+                    this.dom.shareReceiptNo.value = this.getLastSharedReceiptNo(tabName) || '';
+                }
+                if (this.dom.shareLastReceipt) {
+                    this.dom.shareLastReceipt.textContent = last || 'لا يوجد ايصال';
+                }
+                this.dom.shareModal.classList.add('active');
+                var self = this;
+                setTimeout(function() {
+                    if (self.dom.shareReceiptNo) self.dom.shareReceiptNo.focus();
+                }, 250);
+            },
+
+            closeShareModal: function() {
+                this.dom.shareModal.classList.remove('active');
+            },
+
+            getAllReceipts: function() {
+                var headers = this.state.currentHeaders || [];
+                var rows = this.state.currentRows || [];
+                return App.groupRowsByReceipt(rows, headers);
+            },
+
+            getLastReceiptNo: function() {
+                var receipts = this.getAllReceipts();
+                if (!receipts.length) return '';
+                return receipts[receipts.length - 1].receiptNo;
+            },
+
+            getReceiptsFromReceiptNoToLast: function(receiptNo) {
+                var normalizedReceiptNo = String(receiptNo || '').trim();
+                if (!normalizedReceiptNo) {
+                    return { error: 'الرجاء إدخال رقم الايصال' };
+                }
+
+                var receipts = this.getAllReceipts();
+                if (!receipts.length) {
+                    return { error: 'لا توجد ايصالات في هذه الصفحة' };
+                }
+
+                var startIndex = -1;
+                for (var i = 0; i < receipts.length; i++) {
+                    if (String(receipts[i].receiptNo).trim() === normalizedReceiptNo) {
+                        startIndex = i;
+                        break;
+                    }
+                }
+
+                if (startIndex === -1) {
+                    return { error: 'لم يتم العثور على الايصال رقم ' + normalizedReceiptNo };
+                }
+
+                return {
+                    receiptNo: normalizedReceiptNo,
+                    receipts: receipts.slice(startIndex)
+                };
+            },
+
+            copyAndShare: function(message, label) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(message).then(function() {
+                        App.showToast('✅ تم نسخ ' + label + ' — فتح واتساب');
+                        App.closeShareModal();
+                        App.openWhatsApp(message);
+                    }).catch(function() {
+                        App.closeShareModal();
+                        App.openWhatsApp(message);
+                    });
+                } else {
+                    App.closeShareModal();
+                    App.openWhatsApp(message);
+                }
+            },
+
+            shareByReceiptNo: function() {
+                var tabName = this.state.currentTab;
+                if (!tabName || tabName.indexOf('تصريف') === -1) return;
+
+                var input = this.dom.shareReceiptNo ? this.dom.shareReceiptNo.value.trim() : '';
+                var result = this.getReceiptsFromReceiptNoToLast(input);
+                if (result.error) {
+                    this.showToast(result.error);
+                    return;
+                }
+
+                this.setLastSharedReceiptNo(tabName, result.receiptNo);
+                var message = App.formatShareMessage(result.receipts);
+                App.copyAndShare(message, result.receipts.length + ' ايصال');
+            },
+
+            shareSingleRow: function(ri) {
+                var tabName = this.state.currentTab;
+                if (!tabName || tabName.indexOf('تصريف') === -1) return;
+
+                var headers = this.state.currentHeaders || [];
+                var rows = this.state.currentRows || [];
+
+                var targetReceipt = null;
+                if (ri >= 0 && ri < rows.length) {
+                    var row = rows[ri];
+                    var formatted = App.formatReceiptRow(row, headers);
+                    var receiptNo = String(formatted.receiptNo || '').trim();
+                    if (receiptNo) {
+                        var receipts = App.groupRowsByReceipt(rows, headers);
+                        for (var i = 0; i < receipts.length; i++) {
+                            if (String(receipts[i].receiptNo).trim() === receiptNo) {
+                                targetReceipt = receipts[i];
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (!targetReceipt) {
+                    this.showToast('لم يتم العثور على الايصال');
+                    return;
+                }
+
+                var message = App.formatShareMessage([targetReceipt]);
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(message).then(function() {
+                        App.showToast('تم نسخ الايصال — فتح واتساب');
+                        App.openWhatsApp(message);
+                    }).catch(function() {
+                        App.openWhatsApp(message);
+                    });
+                } else {
+                    App.openWhatsApp(message);
+                }
+            },
+
+            updateShareButtonVisibility: function() {
+                var tabName = this.state.currentTab;
+                if (tabName && tabName.indexOf('تصريف') !== -1) {
+                    this.dom.shareBtn.classList.add('show');
+                } else {
+                    this.dom.shareBtn.classList.remove('show');
+                }
             },
 
             // ============================================
