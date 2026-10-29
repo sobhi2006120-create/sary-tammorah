@@ -1268,10 +1268,11 @@
         })();
 
         // الأوراق المسموح فيها بالكتابة
-        var WRITABLE_SHEETS = ['دفتر عمال', 'دفتر سلف', 'تصريف ايصالات'];
+        var WRITABLE_SHEETS = ['دفتر عمال', 'دفتر سلف', 'تصريف ايصالات', 'استهلاك اسمنت'];
 
         function isWritable(tabName) {
-            return WRITABLE_SHEETS.indexOf(String(tabName || '').trim()) !== -1;
+            var t = String(tabName || '').trim();
+            return WRITABLE_SHEETS.some(function(s) { return s.trim() === t; });
         }
 
         // الأوراق التي يُسمح فيها بطباعة صف يحوي خلية مدمجة عند النقر عليه
@@ -2156,8 +2157,8 @@
                     this.dom.fabTask.classList.remove('active');
                 }
 
-                // إظهار زر مستودع اسمنت فقط في صفحة "مستودع اسمنت"
-                if (tabName && tabName.indexOf('اسمنت') !== -1) {
+                // إظهار زر مستودع اسمنت فقط في صفحة "مستودع اسمنت" (وليس سجل استهلاك اسمنت)
+                if (tabName && tabName.indexOf('مستودع اسمنت') !== -1) {
                     this.dom.fabCement.classList.add('active');
                 } else {
                     this.dom.fabCement.classList.remove('active');
@@ -2219,7 +2220,8 @@
             // تحميل بيانات تبويب معين
             loadTabData: function(tabName) {
                 var writable = isWritable(tabName);
-                this.dom.sectionTitle.innerHTML = writable ? tabName :
+                this.dom.sectionTitle.innerHTML = writable ?
+                    tabName + ' <span style="color:var(--text-muted);font-size:0.85rem;">| ⬆ الأحدث أولاً</span>' :
                     tabName + ' <span class="readonly-badge">| 🔒 قراءة فقط</span>';
 
                 // إظهار زر التحديث فقط للأوراق غير القابلة للكتابة
@@ -2350,7 +2352,13 @@
                     html += '<tr><td colspan="' + headers.length + '" style="text-align:center;color:var(--text-muted);padding:2rem;">' +
                         'لا توجد بيانات بعد</td></tr>';
                 } else {
-                    rows.forEach(function(row, ri) {
+                    // عرض معكوس للأوراق القابلة للكتابة (الأحدث أولاً):
+                    // المحافظة على المؤشر الأصلي للصف (ri) لإجريت التعديل/الحذف/المشاركة في موقعه الصحيح بجوجل
+                    var dispIdxs = [];
+                    for (var rr = rows.length - 1; rr >= 0; rr--) dispIdxs.push(rr);
+                    if (!writable) dispIdxs.reverse();
+                    dispIdxs.forEach(function(ri) {
+                        var row = rows[ri];
                         var absRow = headerRow + 1 + ri;
                         // كشف الصف الذي يحوي خلية مدمجة (أي صف يقع ضمن نطاق دمج)
                         var hasMerged = false;
@@ -3098,7 +3106,7 @@
             // فتح نافذة مستودع اسمنت
             openCementModal: function() {
                 var tabName = this.state.currentTab;
-                if (!tabName || tabName.indexOf('اسمنت') === -1) {
+                if (!tabName || tabName.indexOf('مستودع اسمنت') === -1) {
                     this.showToast('هذا الزر مخصص لصفحة مستودع اسمنت فقط');
                     return;
                 }
